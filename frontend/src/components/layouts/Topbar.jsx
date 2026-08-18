@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 const Topbar = () => {
   const navigate = useNavigate()
   return (
-    <header className="h-20 border-b border-[var(--outline-variant)] bg-[var(--surface)] flex items-center justify-end px-8 sticky top-0 z-1000 ">
+    <header className="h-20 border-b border-[var(--outline-variant)] bg-[var(--surface)] flex items-center justify-end px-8 sticky top-0 z-100 ">
 
       <div className="flex items-center gap-5">
         <button onClick={() => navigate("/notifications")} className="cursor-pointer relative text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]">

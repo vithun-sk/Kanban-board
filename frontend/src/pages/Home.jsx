@@ -1,51 +1,18 @@
-import React from "react";
+import React, { useState } from "react";
 import { Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "@/components/layouts/Sidebar";
 import Topbar from "@/components/layouts/Topbar";
 import StatCard from "@/components/dashboard/StatCard";
 import ProjectCard from "@/components/projects/ProjectCard";
-import TaskRow from "@/components/dashboard/TaskRow";
+import TaskRow from "@/components/tasks/TaskRow";
+import { projects } from "@/Data/projectsData";
+import { tasks } from "@/Data/tasksData";
+import TaskDetailsModal from "@/components/tasks/TaskDetailsModal";
 
 const Home = () => {
   const navigate = useNavigate();
-  const projects = [
-    {
-      id: "flowsync",
-      name: "FlowSync",
-      description:
-        "Collaborative project management platform for modern teams.",
-      members: 5,
-      tasks: 24,
-      progress: 72,
-      status: "In Progress",
-      createdAt: "Aug 10, 2026",
-      color: "primary",
-    },
-    {
-      id: "ecommerce",
-      name: "E-Commerce Platform",
-      description: "A scalable shopping platform with payments and analytics.",
-      members: 8,
-      tasks: 41,
-      progress: 58,
-      status: "In Progress",
-      createdAt: "Aug 7, 2026",
-      color: "secondary",
-    },
-    {
-      id: "portfolio",
-      name: "Portfolio Website",
-      description: "Personal portfolio website with project case studies.",
-      members: 3,
-      tasks: 18,
-      progress: 100,
-      status: "Completed",
-      createdAt: "Jul 28, 2026",
-      color: "success",
-    },
-  ];
-
+  const [selectedTask, setSelectedTask] = useState(null);
   return (
     <div className="min-h-screen bg-[var(--surface)] text-[var(--on-surface)] flex flex-row">
       <div>
@@ -95,7 +62,7 @@ const Home = () => {
               </button>
             </div>
             <div className="grid grid-cols-3 gap-5">
-              {projects.map((project) => (
+              {projects.slice(-3).map((project) => (
                 <div key={project.id}>
                   <ProjectCard project={project} />
                 </div>
@@ -119,10 +86,33 @@ const Home = () => {
                 View all
               </button>
             </div>
-            <TaskRow />
+            <div className="mt-8 overflow-hidden rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container)]">
+              <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-4 border-b border-[var(--outline-variant)] bg-[var(--surface-container-high)] px-5 py-4 text-xs font-semibold uppercase tracking-wide text-[var(--outline)]">
+                <span>Task</span>
+                <span>Status</span>
+                <span>Priority</span>
+                <span>Assignee</span>
+                <span>Due / Comments</span>
+              </div>
+              {tasks.slice(-4).map((task) => (
+                <div
+                  key={task.id}
+                  onClick={() => setSelectedTask(task)}
+                  className="cursor-pointer"
+                >
+                  <TaskRow task={task} />
+                </div>
+              ))}
+            </div>
           </section>
         </div>
       </main>
+      {selectedTask && (
+        <TaskDetailsModal
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+        />
+      )}
     </div>
   );
 };

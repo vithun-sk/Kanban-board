@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import Sidebar from "@/components/layouts/Sidebar";
 import Topbar from "@/components/layouts/Topbar";
 import ProjectCard from "@/components/projects/ProjectCard";
+import {projects} from "@/Data/projectsData"
 
 const Projects = () => {
   const navigate = useNavigate();
@@ -11,76 +12,6 @@ const Projects = () => {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
 
-  const projects = [
-    {
-      id: "flowsync",
-      name: "FlowSync",
-      description:
-        "Collaborative project management platform for modern teams.",
-      members: 5,
-      tasks: 24,
-      progress: 72,
-      status: "In Progress",
-      createdAt: "Aug 10, 2026",
-      color: "primary",
-    },
-    {
-      id: "ecommerce",
-      name: "E-Commerce Platform",
-      description: "A scalable shopping platform with payments and analytics.",
-      members: 8,
-      tasks: 41,
-      progress: 58,
-      status: "In Progress",
-      createdAt: "Aug 7, 2026",
-      color: "secondary",
-    },
-    {
-      id: "portfolio",
-      name: "Portfolio Website",
-      description: "Personal portfolio website with project case studies.",
-      members: 3,
-      tasks: 18,
-      progress: 100,
-      status: "Completed",
-      createdAt: "Jul 28, 2026",
-      color: "success",
-    },
-    {
-      id: "task-manager",
-      name: "Task Manager",
-      description:
-        "Simple productivity application for organizing daily tasks.",
-      members: 4,
-      tasks: 32,
-      progress: 35,
-      status: "In Progress",
-      createdAt: "Jul 22, 2026",
-      color: "primary",
-    },
-    {
-      id: "ai-assistant",
-      name: "AI Assistant",
-      description: "AI-powered assistant for automating repetitive workflows.",
-      members: 6,
-      tasks: 29,
-      progress: 15,
-      status: "In Progress",
-      createdAt: "Jul 15, 2026",
-      color: "secondary",
-    },
-    {
-      id: "landing-page",
-      name: "Marketing Landing Page",
-      description: "Landing page redesign for a SaaS product.",
-      members: 2,
-      tasks: 12,
-      progress: 100,
-      status: "Completed",
-      createdAt: "Jul 5, 2026",
-      color: "success",
-    },
-  ];
   const filteredProjects = useMemo(() => {
     return projects.filter((project) => {
       const matchesSearch =
@@ -101,7 +32,7 @@ const Projects = () => {
     <div className="min-h-screen bg-[var(--surface)] text-[var(--on-surface)] flex flex-row">
       <Sidebar />
 
-      <main className="min-h-screen">
+      <main className="min-h-screen flex flex-col flex-1">
         <Topbar />
         <div className="p-8">
           <section className="flex items-start justify-between">
@@ -223,7 +154,6 @@ const Projects = () => {
                     onClick={() => handleProjectClick(project)}
                     className="cursor-pointer"
                   >
-                    <ProjectCard project={project} />
                     <ProjectCard project={project} />
                   </div>
                 ))}

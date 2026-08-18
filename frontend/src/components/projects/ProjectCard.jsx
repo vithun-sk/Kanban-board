@@ -1,7 +1,7 @@
 import React from "react";
 import { FolderKanban, MoreHorizontal } from "lucide-react";
 
-const ProjectCard = ({project}) => {
+const ProjectCard = ({ project }) => {
   return (
     <div className="grid grid-cols-3 gap-4">
       <div
@@ -17,7 +17,6 @@ const ProjectCard = ({project}) => {
             <MoreHorizontal size={20} />
           </button>
         </div>
-
         <h3 className="font-semibold text-lg mt-4">{project.name}</h3>
 
         <p className="text-sm text-[var(--on-surface-variant)] mt-1 line-clamp-2">
@@ -53,7 +52,9 @@ const ProjectCard = ({project}) => {
           >
             {project.status}
           </span>
-          <span className="text-xs pt-1 text-[var(--on-surface-variant)]">{project.createdAt}</span>
+          <span className="text-xs pt-1 text-[var(--on-surface-variant)]">
+            {project.createdAt}
+          </span>
         </div>
       </div>
     </div>
