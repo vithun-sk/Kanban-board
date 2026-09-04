@@ -15,12 +15,12 @@ const LoginCard = () => {
       <p className="text-sm">Sign in to continue to your workspace</p>
       <form className="mt-10">
         <div className="flex flex-col gap-1  mx-10">
-          <label htmlFor="email" className="text-xs font-semibold text-left ">
-            {" "}
+          <label htmlFor="emailInput" className="text-xs font-semibold text-left ">
             EMAIL ADDRESS
           </label>
           <input
             type="email"
+            id="emailInput"
             name="email"
             placeholder="Enter Email"
             className="w-[100%] p-2 rounded-xl border-2 border-[gray] pl-3"
@@ -29,7 +29,7 @@ const LoginCard = () => {
         <div className="flex flex-col gap-1 mt-6 mx-10">
           <div className="flex flex-row justify-between">
             <label
-              htmlFor="password"
+              htmlFor="passwordInput"
               className="text-xs font-semibold text-left "
             >
               PASSWORD
@@ -43,7 +43,9 @@ const LoginCard = () => {
           </div>
           <input
             type="password"
+            id="passwordInput"
             name="password"
+
             placeholder="Enter Password"
             className="w-[100%] p-2 rounded-xl border-2 border-[gray] pl-3"
           />

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "@/components/layouts/Sidebar";
@@ -13,6 +13,25 @@ import TaskDetailsModal from "@/components/tasks/TaskDetailsModal";
 const Home = () => {
   const navigate = useNavigate();
   const [selectedTask, setSelectedTask] = useState(null);
+  const [currentDate, setCurrentDate] = useState();
+
+  useEffect(() => {
+    const updateDate = () => {
+      const now = new Date();
+
+      const dateOptions = {
+         month: "long",
+        day: "numeric",
+        weekday: "long",
+        year: "numeric",
+       
+      };
+
+      setCurrentDate(now.toLocaleDateString('en-US' , dateOptions))
+    };
+
+    updateDate();
+  }, []);
   return (
     <div className="min-h-screen bg-[var(--surface)] text-[var(--on-surface)] flex flex-row">
       <div>
@@ -25,7 +44,7 @@ const Home = () => {
           <section className="flex items-start justify-between mb-8">
             <div>
               <p className="text-sm text-[var(--outline)] mb-1">
-                Sunday, August 16, 2026
+                {currentDate}
               </p>
               <h1 className="text-3xl font-bold">
                 Welcome back, Vithun

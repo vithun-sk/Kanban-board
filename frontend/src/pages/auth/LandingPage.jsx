@@ -19,22 +19,14 @@ import {
 const LandingPage = () => {
   const navigate = useNavigate();
 
-  const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
-  };
-
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--on-surface)]">
 
-      <nav className="sticky top-0 z-50 flex flex-col gap-5 border-b border-[var(--outline-variant)] bg-[var(--background)]/95 px-5 py-5 backdrop-blur md:flex-row md:items-center md:justify-between">
+      <nav className="sticky top-0 z-50 flex flex-col gap-5 border-b border-[var(--outline-variant)] bg-[var(--background)] px-5 py-5 backdrop-blur md:flex-row md:items-center md:justify-between">
         {/* Logo */}
 
         <div
-          onClick={scrollToTop}
-          className="cursor-pointer text-3xl text-[var(--on-surface)]"
+          className="cursor-text text-3xl text-[var(--on-surface)]"
         >
           Flow<span className="font-black text-[var(--primary)]">Sync</span>
         </div>
@@ -42,11 +34,11 @@ const LandingPage = () => {
         {/* Navigation */}
 
         <div>
-          <ul className="flex flex-wrap items-center justify-center gap-6 md:gap-10">
+          <ul className="flex flex-wrap items-center justify-center gap-10">
             <li>
               <a
                 href="#features"
-                className="text-sm text-[var(--on-surface-variant)] transition-colors duration-300 hover:text-[var(--on-surface)] md:text-lg"
+                className="text-lg text-[var(--on-surface-variant)] transition-colors duration-300 hover:text-[var(--on-surface)] "
               >
                 Features
               </a>
@@ -55,7 +47,7 @@ const LandingPage = () => {
             <li>
               <a
                 href="#how-it-works"
-                className="text-sm text-[var(--on-surface-variant)] transition-colors duration-300 hover:text-[var(--on-surface)] md:text-lg"
+                className="text-lg text-[var(--on-surface-variant)] transition-colors duration-300 hover:text-[var(--on-surface)]"
               >
                 How It Works
               </a>
@@ -64,7 +56,7 @@ const LandingPage = () => {
             <li>
               <a
                 href="#pricing"
-                className="text-sm text-[var(--on-surface-variant)] transition-colors duration-300 hover:text-[var(--on-surface)] md:text-lg"
+                className="text-lg text-[var(--on-surface-variant)] transition-colors duration-300 hover:text-[var(--on-surface)] "
               >
                 Pricing
               </a>
@@ -139,7 +131,6 @@ const LandingPage = () => {
           <div className="rounded-2xl border border-[var(--outline-variant)] bg-[var(--secondary-container)] p-4 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <span className="font-semibold">Website Redesign</span>
-
               <span className="rounded-full bg-[var(--primary)] px-3 py-1 text-xs text-white">
                 Active
               </span>
@@ -358,7 +349,7 @@ const LandingPage = () => {
                 Free
               </p>
 
-              <h3 className="mt-3 text-4xl font-bold">₹0</h3>
+              <h3 className="mt-3 text-4xl font-bold">$0</h3>
 
               <p className="mt-2 text-[var(--on-surface-variant)]">
                 Perfect for getting started.
@@ -416,7 +407,6 @@ const LandingPage = () => {
         <div className="flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
 
           <div
-            onClick={scrollToTop}
             className="cursor-pointer text-3xl text-[var(--on-surface)]"
           >
             Flow<span className="font-black text-[var(--primary)]">Sync</span>
