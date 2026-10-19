@@ -5,7 +5,7 @@ const ProjectCard = ({ project }) => {
   return (
     <div className="grid grid-cols-3 gap-4">
       <div
-        key={project.name}
+        key={project.id}
         className="w-90 bg-[var(--surface-container)] border border-[var(--outline-variant)] rounded-xl p-5 hover:border-[var(--primary)] transition cursor-pointer"
       >
         <div className="flex justify-between">

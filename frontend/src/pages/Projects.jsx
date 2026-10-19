@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Plus, Search, SlidersHorizontal, FolderKanban } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "@/components/layouts/Sidebar";
@@ -167,10 +167,6 @@ const Projects = () => {
                 <h3 className="mt-4 text-lg font-semibold">
                   No projects found
                 </h3>
-
-                <p className="mt-1 text-sm text-[var(--outline)]">
-                  Try changing your search or filter.
-                </p>
 
                 <button
                   onClick={() => {

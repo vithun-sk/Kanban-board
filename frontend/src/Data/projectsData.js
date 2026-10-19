@@ -1,6 +1,6 @@
 export const projects = [
     {
-      id: "flowsync",
+      id: "1",
       name: "FlowSync",
       description:
         "Collaborative project management platform for modern teams.",
@@ -12,7 +12,7 @@ export const projects = [
       color: "primary",
     },
     {
-      id: "ecommerce",
+      id: "2",
       name: "E-Commerce Platform",
       description: "A scalable shopping platform with payments and analytics.",
       members: 8,
@@ -23,7 +23,7 @@ export const projects = [
       color: "secondary",
     },
     {
-      id: "portfolio",
+      id: "3",
       name: "Portfolio Website",
       description: "Personal portfolio website with project case studies.",
       members: 3,
@@ -34,7 +34,7 @@ export const projects = [
       color: "success",
     },
     {
-      id: "task-manager",
+      id: "4",
       name: "Task Manager",
       description:
         "Simple productivity application for organizing daily tasks.",
@@ -46,7 +46,7 @@ export const projects = [
       color: "primary",
     },
     {
-      id: "ai-assistant",
+      id: "5",
       name: "AI Assistant",
       description: "AI-powered assistant for automating repetitive workflows.",
       members: 6,
@@ -57,7 +57,7 @@ export const projects = [
       color: "secondary",
     },
     {
-      id: "landing-page",
+      id: "6",
       name: "Marketing Landing Page",
       description: "Landing page redesign for a SaaS product.",
       members: 2,
