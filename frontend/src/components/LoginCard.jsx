@@ -38,6 +38,9 @@ const LoginCard = () => {
       const destination = location.state?.from || "/home";
       navigate(destination, { replace: true });
     } catch (error) {
+      if (error.details && typeof error.details === "object") {
+        setErrors(error.details);
+      }
       setFormError(error.message || "Unable to sign in.");
     } finally {
       setLoading(false);
@@ -93,27 +96,31 @@ const LoginCard = () => {
             </button>
           </div>
         </Field>
-        <p className="text-left text-xs text-[var(--outline)]">
-          Password reset is not available in demo mode.
-        </p>
+        {isDemoMode() ? (
+          <p className="text-left text-xs text-[var(--outline)]">
+            Password reset is not available in demo mode.
+          </p>
+        ) : null}
         {formError ? <p className="text-sm text-[var(--error)]">{formError}</p> : null}
         {info ? <p className="text-sm text-[var(--outline)]">{info}</p> : null}
-        <Button type="submit" disabled={loading} className="h-11 w-full rounded-xl text-lg">
-          {loading ? "Signing in..." : "Login"}
+        <Button
+          type="submit"
+          disabled={loading}
+          className="w-full cursor-pointer bg-[var(--primary)] py-5 text-white transition hover:bg-[#4338CA]"
+        >
+          {loading ? "Signing in..." : "Sign in"}
         </Button>
       </form>
-      <div className="mt-4 border-t border-slate-300">
-        <p className="p-3">
-          Don't have an account?{" "}
-          <button
-            type="button"
-            className="text-lg font-medium text-[var(--primary)]"
-            onClick={() => navigate("/register")}
-          >
-            Create account
-          </button>
-        </p>
-      </div>
+      <p className="mt-6 text-sm text-[var(--outline)]">
+        Don&apos;t have an account?{" "}
+        <button
+          type="button"
+          onClick={() => navigate("/register")}
+          className="font-semibold text-[var(--primary)] hover:underline"
+        >
+          Sign up
+        </button>
+      </p>
     </div>
   );
 };

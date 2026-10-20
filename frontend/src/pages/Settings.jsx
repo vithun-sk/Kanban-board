@@ -4,6 +4,7 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { useApp } from "@/context/AppContext";
 import { useToast } from "@/context/ToastContext";
 import { isValidEmail } from "@/lib/validation";
+import { changePasswordApi } from "@/services/membersService";
 
 const Settings = () => {
   const {
@@ -14,6 +15,7 @@ const Settings = () => {
     updateSettings,
     updateProfile,
     resetWorkspace,
+    isDemoMode,
   } = useApp();
   const { push } = useToast();
   const [name, setName] = useState(currentUser.name);
@@ -22,7 +24,13 @@ const Settings = () => {
   const [confirmReset, setConfirmReset] = useState(false);
   const [notify, setNotify] = useState(settings);
 
-  const saveProfile = (event) => {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [pwdError, setPwdError] = useState("");
+  const [pwdLoading, setPwdLoading] = useState(false);
+
+  const saveProfile = async (event) => {
     event.preventDefault();
     const next = {};
     if (!name.trim()) next.name = "Name is required.";
@@ -30,14 +38,48 @@ const Settings = () => {
     else if (!isValidEmail(email)) next.email = "Enter a valid email.";
     setErrors(next);
     if (Object.keys(next).length) return;
-    updateProfile({ name, email });
-    push("Profile saved in this browser only.");
+    try {
+      await updateProfile({ name, email });
+      push("Profile saved successfully.");
+    } catch (err) {
+      push(err.message || "Failed to update profile.", "error");
+    }
   };
 
   const savePrefs = (event) => {
     event.preventDefault();
     updateSettings(notify);
-    push("Preferences saved locally.");
+    push("Preferences saved.");
+  };
+
+  const handlePasswordChange = async (event) => {
+    event.preventDefault();
+    setPwdError("");
+    if (!currentPassword) {
+      setPwdError("Current password is required.");
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPwdError("New password must be at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setPwdError("New passwords do not match.");
+      return;
+    }
+
+    setPwdLoading(true);
+    try {
+      await changePasswordApi(currentPassword, newPassword);
+      push("Password changed successfully.");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+    } catch (err) {
+      setPwdError(err.message || "Failed to change password.");
+    } finally {
+      setPwdLoading(false);
+    }
   };
 
   return (
@@ -45,7 +87,9 @@ const Settings = () => {
       <div>
         <h1 className="text-3xl font-bold">Settings</h1>
         <p className="mt-2 text-[var(--on-surface-variant)]">
-          Demo preferences are stored in this browser. They are not synced to a server.
+          {isDemoMode
+            ? "Demo preferences are stored in this browser. They are not synced to a server."
+            : "Manage your profile, account preferences, and security settings."}
         </p>
       </div>
 
@@ -79,7 +123,7 @@ const Settings = () => {
             >
               Cancel
             </button>
-            <button type="submit" className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm text-white">
+            <button type="submit" className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm text-white hover:bg-[#4338CA]">
               Save profile
             </button>
           </div>
@@ -110,7 +154,7 @@ const Settings = () => {
           {[
             ["notifyTaskAssigned", "Task assignment updates"],
             ["notifyDeadlines", "Deadline reminders"],
-            ["notifyMessages", "Demo message activity"],
+            ["notifyMessages", "Message activity"],
           ].map(([key, label]) => (
             <label key={key} className="flex items-center gap-3 text-sm">
               <input
@@ -121,7 +165,7 @@ const Settings = () => {
               {label}
             </label>
           ))}
-          <button type="submit" className="mt-3 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm text-white">
+          <button type="submit" className="mt-3 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm text-white hover:bg-[#4338CA]">
             Save preferences
           </button>
         </form>
@@ -129,24 +173,66 @@ const Settings = () => {
 
       <section className="rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container)] p-6">
         <h2 className="text-lg font-semibold">Password</h2>
-        <p className="mt-2 text-sm text-[var(--outline)]">
-          Password changes require a backend account service. This demo does not change or store passwords.
-        </p>
+        {isDemoMode ? (
+          <p className="mt-2 text-sm text-[var(--outline)]">
+            Password changes require a backend account service. Connect the Spring Boot API to enable password management.
+          </p>
+        ) : (
+          <form onSubmit={handlePasswordChange} className="mt-4 space-y-4">
+            <Field label="Current password" htmlFor="current-pwd">
+              <input
+                id="current-pwd"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="New password" htmlFor="new-pwd">
+              <input
+                id="new-pwd"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Confirm new password" htmlFor="confirm-new-pwd">
+              <input
+                id="confirm-new-pwd"
+                type="password"
+                value={confirmNewPassword}
+                onChange={(e) => setConfirmNewPassword(e.target.value)}
+                className={inputClass}
+              />
+            </Field>
+            {pwdError ? <p className="text-sm text-[var(--error)]">{pwdError}</p> : null}
+            <button
+              type="submit"
+              disabled={pwdLoading}
+              className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm text-white hover:bg-[#4338CA]"
+            >
+              {pwdLoading ? "Updating..." : "Update password"}
+            </button>
+          </form>
+        )}
       </section>
 
-      <section className="rounded-xl border border-[var(--error)] bg-[var(--surface-container)] p-6">
-        <h2 className="text-lg font-semibold">Reset demo data</h2>
-        <p className="mt-2 text-sm text-[var(--outline)]">
-          Restore the original sample projects, tasks, messages, and notifications in this browser.
-        </p>
-        <button
-          type="button"
-          onClick={() => setConfirmReset(true)}
-          className="mt-4 rounded-lg bg-[var(--error)] px-4 py-2 text-sm text-white"
-        >
-          Reset workspace
-        </button>
-      </section>
+      {isDemoMode ? (
+        <section className="rounded-xl border border-[var(--error)] bg-[var(--surface-container)] p-6">
+          <h2 className="text-lg font-semibold">Reset demo data</h2>
+          <p className="mt-2 text-sm text-[var(--outline)]">
+            Restore the original sample projects, tasks, messages, and notifications in this browser.
+          </p>
+          <button
+            type="button"
+            onClick={() => setConfirmReset(true)}
+            className="mt-4 rounded-lg bg-[var(--error)] px-4 py-2 text-sm text-white"
+          >
+            Reset workspace
+          </button>
+        </section>
+      ) : null}
 
       {confirmReset ? (
         <ConfirmDialog

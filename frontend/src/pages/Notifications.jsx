@@ -62,7 +62,7 @@ const Notifications = () => {
 
       {items.length === 0 ? (
         <div className="mt-8">
-          <EmptyState icon={<Bell size={28} />} title="No notifications" description="You're all caught up in this demo workspace." />
+          <EmptyState icon={<Bell size={28} />} title="No notifications" description="You're all caught up." />
         </div>
       ) : (
         <ul className="mt-8 space-y-3">

@@ -1,310 +1,279 @@
 # 📋 Collaborative Kanban Board – FlowSync
 
-FlowSync is a full-stack web application designed to simplify project management and team collaboration. Teams often manage their work through scattered messages, spreadsheets, and separate tools, making it difficult to track task progress, manage deadlines, and coordinate responsibilities. Collaborative Kanban Board provides a centralized platform where users can create projects, organize tasks, collaborate with team members, and track project progress through a visual Kanban board.
+FlowSync is a modern, enterprise-ready full-stack project management and collaboration platform. It provides agile teams with a visual Kanban workflow, task tracking, deadline management, team coordination, messaging, and real-time activity metrics.
+
+FlowSync supports **Dual-Mode Execution**:
+1. **API Mode (Full Stack)**: Connects to a Java 21 Spring Boot REST API with MySQL persistence, Flyway migrations, stateless JWT authentication, and server-side authorization.
+2. **Demo Mode (Offline / Sandbox)**: Runs entirely client-side using localStorage persistence, allowing instant zero-setup exploration and testing without requiring external infrastructure.
 
 ---
 
-## 📖 About the Project
+## 🛠️ Architecture & Tech Stack
 
-Collaborative Kanban Board is designed to make team-based project management simpler and more organized.
-
-- Teams need a clear way to divide projects into manageable tasks.
-- Members need to know which tasks are pending, in progress, under review, or completed.
-- Project owners need to track progress, assign responsibilities, and manage deadlines.
-- Team members need a common place to communicate and collaborate.
-
-FlowSync aims to solve these problems by providing a unified workspace for project planning, task tracking, team collaboration, and progress monitoring.
+| Layer | Technologies |
+|---|---|
+| **Frontend** | React 19, Vite 8, Tailwind CSS v4, Lucide React, Radix UI primitives |
+| **Backend** | Java 21, Spring Boot 3.4.3, Spring Security 6, Spring Data JPA, Hibernate 6 |
+| **Database & Migration** | MySQL 8.0, Flyway Database Migrations |
+| **Authentication & Security** | BCrypt password hashing, JJWT (0.12.6), Stateless Bearer Token Filter |
+| **Build & Tooling** | Maven Wrapper (`mvnw`), npm, Oxlint |
 
 ---
 
 ## 🧩 Key Features
 
-### 📊 Dashboard
-- Overview of projects, tasks, and completion progress.
-- Statistics for pending, in-progress, and completed tasks.
-- Recent projects and assigned tasks.
-- Quick access to important project activities.
-
-### 📁 Project Management
-- Create and manage projects.
-- View project details, status, and progress.
-- Search and filter projects.
-- Organize project information in one place.
-
-### 📋 Kanban Board
-- Organize tasks into workflow columns such as `To Do`, `In Progress`, `In Review`, and `Done`.
-- Visualize task progress using task cards.
-- Update task status as work progresses.
-- View task details without navigating to a separate page.
-
-### ✅ Task Management
-- Create, edit, and manage tasks.
-- Assign tasks to team members.
-- Set task priorities and due dates.
-- Track task status and completion.
-- Add task descriptions and comments.
-
-### 👥 Team Collaboration
-- Organize members within projects.
-- Assign responsibilities to team members.
-- Support project roles and permissions.
-- Share project updates and coordinate work.
-
-### 💬 Team Communication
-- Project-specific discussions and task comments.
-- Share updates and discuss work-related issues.
-- Potential real-time messaging using WebSockets.
-
-### 📅 Calendar
-- View tasks and deadlines in a calendar.
-- Track upcoming due dates.
-- Plan project activities more effectively.
-
-### 🔔 Notifications and Activity
-- Notify users about relevant task assignments and updates.
-- Highlight approaching deadlines.
-- Track important project activities.
-
-### 🔍 Review and Approval Workflow
-- Submit completed tasks for review.
-- Allow authorized reviewers to approve tasks or request changes.
-- Track the review status of tasks.
-
-### 🔐 Authentication and Authorization
-- User registration and login.
-- Secure authentication using Spring Security and JWT.
-- Protected application routes and APIs.
-- Role-based access control for authorized actions.
-
-### ⚙️ User Settings
-- Manage user profile information.
-- Configure account preferences.
-- Manage notification preferences.
+- **📊 Comprehensive Dashboard**: Real-time project and task metrics, in-progress workloads, overdue task tracking, recent projects, and workspace activity log.
+- **📋 Visual Kanban Board**: Drag-and-drop or column-based status movement across `To Do`, `In Progress`, `In Review`, and `Done` states.
+- **📁 Project Management**: Create, view, edit, and delete projects. Custom project color badges, visibility toggles, start dates, deadlines, and dynamic completion progress calculations.
+- **👥 Project Members & Collaboration**: Assign registered members to projects with specific roles (`Owner`, `Admin`, `Member`, `Viewer`).
+- **✅ Task Management**: Full task lifecycle with priorities (`Low`, `Medium`, `High`, `Urgent`), assignees, start and due dates, labels, and overdue status indicators.
+- **📅 Interactive Calendar**: Monthly calendar view with task distribution, overdue highlights, and quick task status inspection.
+- **💬 Team Messaging**: Real-time multi-conversation chat between workspace members with unread indicators.
+- **🔔 Notifications**: Activity-driven notifications for task updates, project assignments, and deadlines, with individual read and mark-all-read capabilities.
+- **🔐 Secure Authentication**: Real registration and login flows with email validation, password masking toggles, BCrypt encryption, and persistent JWT session management.
+- **⚙️ User Preferences & Security**: Profile updates, password changes, notification preferences, and light/dark theme switching.
 
 ---
 
-## 🛠️ Tech Stack
-
-| Category | Technologies |
-|---|---|
-| **Frontend** | React.js, Vite, JavaScript |
-| **Styling** | Tailwind CSS, shadcn/ui, Radix UI |
-| **Backend** | Java, Spring Boot |
-| **Database** | MySQL |
-| **Authentication** | Spring Security, JWT |
-| **API Communication** | REST APIs |
-| **Real-Time Communication** | WebSockets, if implemented |
-| **Version Control** | Git, GitHub |
-| **Development Tools** | VS Code, Postman, IntelliJ IDEA or Eclipse |
-
----
-
-## ✨ Project Highlights
-
-- Centralized project and task management.
-- Visual Kanban workflow for tracking progress.
-- Task assignments, priorities, and deadlines.
-- Team-based project collaboration.
-- Role-based access control.
-- Responsive user interface.
-- Spring Boot REST API architecture.
-- Persistent data storage using MySQL.
-- Potential real-time communication and notifications.
-
----
-
-## 🧰 Installation & Setup
-
-Follow these steps to run the project locally after the frontend and backend have been configured.
-
-### Prerequisites
-
-Make sure you have installed:
-
-- Node.js and npm
-- Java JDK 21
-- Maven
-- MySQL Server
-- Git
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/YOUR_USERNAME/Collaborative-Kanban-Board.git
-```
-
-### 2. Navigate into the project directory
-
-```bash
-cd Collaborative-Kanban-Board
-```
-
-### 3. Configure the MySQL database
-
-Start your local MySQL server and create the database:
-
-```sql
-CREATE DATABASE flowsync;
-```
-
-### 4. Configure backend environment variables
-
-Configure the database connection and authentication secret using your local environment or an appropriate environment configuration file.
-
-Example values:
-
-```env
-DB_URL=jdbc:mysql://localhost:3306/flowsync
-DB_USERNAME=your_mysql_username
-DB_PASSWORD=your_mysql_password
-JWT_SECRET=your_secure_secret
-```
-
-These are example variable names. The actual names must match the Spring Boot configuration used in the project.
-
-**Important:** Do not commit database passwords, production secrets, or real JWT secrets to GitHub.
-
-### 5. Run the Spring Boot backend
-
-From the backend directory, run:
-
-```bash
-./mvnw spring-boot:run
-```
-
-On Windows, use:
-
-```bash
-mvnw.cmd spring-boot:run
-```
-
-If the project uses a locally installed Maven instead of the Maven Wrapper, run:
-
-```bash
-mvn spring-boot:run
-```
-
-### 6. Install frontend dependencies
-
-Open a separate terminal:
-
-```bash
-cd frontend
-npm install
-```
-
-### 7. Start the frontend
-
-```bash
-npm run dev
-```
-
-### 8. Open the application
-
-Open the local URL displayed by Vite in your terminal, typically:
-
-```text
-http://localhost:5173
-```
-
-> **Note:** The commands above assume the repository uses `frontend/` and `backend/` directories. Update them if the final project structure differs. Database credentials, JWT configuration, and the frontend API URL must be configured before the full application can work.
-
----
-
-## 📁 Project Structure
-
-The following is the planned project structure. The final folders will be adjusted to match the actual implementation.
+## 📁 Repository Structure
 
 ```text
 Collaborative-Kanban-Board/
-│
-├── frontend/
-│   ├── public/
-│   ├── src/
-│   │   ├── assets/
-│   │   ├── components/
-│   │   │   ├── common/
-│   │   │   ├── dashboard/
-│   │   │   ├── projects/
-│   │   │   ├── tasks/
-│   │   │   ├── calendar/
-│   │   │   └── layout/
-│   │   ├── pages/
-│   │   │   ├── LandingPage.jsx
-│   │   │   ├── Login.jsx
-│   │   │   ├── Signup.jsx
-│   │   │   ├── Dashboard.jsx
-│   │   │   ├── Projects.jsx
-│   │   │   ├── Tasks.jsx
-│   │   │   ├── Calendar.jsx
-│   │   │   ├── Notifications.jsx
-│   │   │   └── Settings.jsx
-│   │   ├── services/
-│   │   ├── context/
-│   │   ├── hooks/
-│   │   ├── Data/
-│   │   ├── App.jsx
-│   │   └── main.jsx
-│   ├── package.json
-│   └── vite.config.js
-│
 ├── backend/
 │   ├── src/
 │   │   ├── main/
-│   │   │   ├── java/
-│   │   │   │   └── com/flowsync/
-│   │   │   │       ├── config/
-│   │   │   │       ├── security/
-│   │   │   │       ├── user/
-│   │   │   │       ├── project/
-│   │   │   │       ├── task/
-│   │   │   │       ├── comment/
-│   │   │   │       ├── chat/
-│   │   │   │       ├── notification/
-│   │   │   │       └── common/
+│   │   │   ├── java/com/flowsync/
+│   │   │   │   ├── auth/            # AuthController, AuthService, JWT response DTOs
+│   │   │   │   ├── common/          # ApiResponse<T>, ErrorResponse wrappers
+│   │   │   │   ├── config/          # DevDataSeeder, CORS, web configs
+│   │   │   │   ├── exception/       # GlobalExceptionHandler, custom exceptions
+│   │   │   │   ├── message/         # Conversation and Message entities, controller, service
+│   │   │   │   ├── notification/    # Notification entity, controller, service
+│   │   │   │   ├── project/         # Project & ProjectMember entities, controller, service
+│   │   │   │   ├── security/        # SecurityConfig, JwtService, JwtAuthenticationFilter
+│   │   │   │   ├── task/            # Task entity, status/priority enums, controller, service
+│   │   │   │   ├── user/            # User entity, UserController, UserService
+│   │   │   │   └── FlowSyncApplication.java
 │   │   │   └── resources/
+│   │   │       ├── db/migration/    # V1__init_schema.sql (Flyway relational schema)
 │   │   │       └── application.properties
 │   │   └── test/
-│   ├── pom.xml
-│   └── mvnw
+│   │       ├── java/com/flowsync/   # Integration & unit test suite (Auth, Tasks, Projects, JWT)
+│   │       └── resources/application-test.properties # In-memory H2 MySQL mode test DB
+│   ├── pom.xml                      # Maven dependencies (Java 21, Spring Boot 3.4.3)
+│   ├── mvnw & mvnw.cmd              # Maven wrapper executables
+│   └── .env.example                 # Backend environment variable template
 │
-├── database/
-│   └── schema.sql
+├── frontend/
+│   ├── src/
+│   │   ├── components/              # UI, layout, kanban, task, project, and auth components
+│   │   ├── config/                  # env.js configuration loader
+│   │   ├── constants/               # Statuses, priorities, storage keys
+│   │   ├── context/                 # AppContext (dual-mode state), ToastContext
+│   │   ├── data/                    # Initial seed data for offline demo mode
+│   │   ├── lib/                     # Utilities (dates, storage, validation, IDs)
+│   │   ├── pages/                   # Route pages (Home, Projects, Tasks, Calendar, Teams, etc.)
+│   │   └── services/                # REST API clients, endpoints, selectors, demo repository
+│   ├── index.html
+│   ├── package.json
+│   ├── vite.config.js
+│   └── .env.example                 # Frontend environment variable template
 │
-├── .gitignore
+├── .gitignore                       # Ignored build outputs, caches, secrets, and .env files
 └── README.md
 ```
 
 ---
 
-## 🔮 Future Enhancements
+## 🚀 Getting Started
 
-- Real-time Kanban board updates.
-- Drag-and-drop task movement.
-- Live project chat and notifications.
-- Email reminders for approaching deadlines.
-- Advanced project analytics and reports.
-- File attachments for tasks.
-- Improved project-level permission management.
+### Prerequisites
+
+- **Java JDK 21+**
+- **Node.js 18+ & npm 9+**
+- **MySQL Server 8.0+** (for real API mode)
+- **Apache Maven 3.9+** (or use the included `./mvnw` / `mvnw.cmd`)
 
 ---
 
-## 🙌 Contributions
+### Backend Setup (Spring Boot & MySQL)
 
-Contributions, issues, and feature requests are welcome!
+#### 1. Create MySQL Database
+Log into your MySQL client and create a new database:
+```sql
+CREATE DATABASE flowsync CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
 
-Feel free to fork this repository and submit a pull request.
+#### 2. Configure Environment Variables
+Copy `backend/.env.example` to `backend/.env` or set environment variables in your terminal:
+```bash
+cp backend/.env.example backend/.env
+```
+
+| Variable | Default Value | Description |
+|---|---|---|
+| `PORT` | `8080` | Port for Spring Boot HTTP server |
+| `DB_URL` | `jdbc:mysql://localhost:3306/flowsync?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC` | JDBC database connection string |
+| `DB_USERNAME` | `root` | MySQL database username |
+| `DB_PASSWORD` | *(empty)* | MySQL database password |
+| `JWT_SECRET` | *(built-in 256-bit dev key)* | Minimum 256-bit secret key for HMAC-SHA256 signing |
+| `JWT_EXPIRATION_MS` | `86400000` (24 hours) | JWT token lifespan in milliseconds |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173,http://localhost:3000` | Allowed origins for web frontend |
+| `DEV_SEED_ENABLED` | `false` | When `true`, automatically creates demo seed accounts on startup |
+
+#### 3. Run the Backend
+Using Maven Wrapper:
+- **Windows**:
+  ```powershell
+  cd backend
+  .\mvnw.cmd spring-boot:run
+  ```
+- **macOS / Linux**:
+  ```bash
+  cd backend
+  ./mvnw spring-boot:run
+  ```
+
+Flyway will automatically execute `V1__init_schema.sql` on startup, creating all tables and relational indexes. The API will be available at `http://localhost:8080/api/v1`.
+
+---
+
+### Frontend Setup (React & Vite)
+
+#### 1. Install Dependencies
+```bash
+cd frontend
+npm install
+```
+
+#### 2. Configure Frontend Mode
+Create or modify `frontend/.env`:
+- **For API Mode (Connecting to Spring Boot Backend)**:
+  ```env
+  VITE_DEMO_MODE=false
+  VITE_API_BASE_URL=http://localhost:8080/api/v1
+  ```
+- **For Demo Mode (Offline Client-Only Exploration)**:
+  ```env
+  VITE_DEMO_MODE=true
+  VITE_API_BASE_URL=
+  ```
+
+#### 3. Start the Frontend Development Server
+```bash
+npm run dev
+```
+Open your browser and navigate to `http://localhost:5173`.
+
+---
+
+## 📡 REST API Reference
+
+All backend responses are wrapped in a standard JSON envelope:
+```json
+{
+  "success": true,
+  "message": "Operation description",
+  "data": { ... },
+  "timestamp": "2026-10-20T10:00:00Z"
+}
+```
+
+### Authentication Endpoints
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `POST` | `/api/v1/auth/register` | Public | Register new user account |
+| `POST` | `/api/v1/auth/login` | Public | Authenticate user & return JWT token |
+| `GET` | `/api/v1/auth/me` | Bearer Token | Get current authenticated user profile |
+
+### User Endpoints
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `GET` | `/api/v1/users` | Bearer Token | List all registered workspace users |
+| `GET` | `/api/v1/users/me` | Bearer Token | Get active user profile |
+| `PATCH` | `/api/v1/users/me` | Bearer Token | Update user profile details |
+| `POST` | `/api/v1/users/me/change-password` | Bearer Token | Change password with current password verification |
+
+### Project Endpoints
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `GET` | `/api/v1/projects` | Bearer Token | List all projects accessible to current user |
+| `POST` | `/api/v1/projects` | Bearer Token | Create a new project |
+| `GET` | `/api/v1/projects/{id}` | Bearer Token | Get project details by ID |
+| `PATCH` | `/api/v1/projects/{id}` | Bearer Token | Update project information |
+| `DELETE` | `/api/v1/projects/{id}` | Bearer Token | Delete project (Owner/Admin only) |
+| `GET` | `/api/v1/projects/{id}/members` | Bearer Token | List project members |
+| `POST` | `/api/v1/projects/{id}/members` | Bearer Token | Add registered member to project |
+| `PATCH` | `/api/v1/projects/{id}/members/{memberId}` | Bearer Token | Update member role |
+| `DELETE` | `/api/v1/projects/{id}/members/{memberId}` | Bearer Token | Remove member from project |
+
+### Task Endpoints
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `GET` | `/api/v1/tasks` | Bearer Token | List all tasks across accessible projects |
+| `POST` | `/api/v1/tasks` | Bearer Token | Create a task |
+| `GET` | `/api/v1/tasks/{id}` | Bearer Token | Get task details |
+| `PATCH` | `/api/v1/tasks/{id}` | Bearer Token | Update task details |
+| `PATCH` | `/api/v1/tasks/{id}/status` | Bearer Token | Move task status (`To Do`, `In Progress`, `In Review`, `Done`) |
+| `DELETE` | `/api/v1/tasks/{id}` | Bearer Token | Delete task |
+
+### Notification & Message Endpoints
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `GET` | `/api/v1/notifications` | Bearer Token | List current user notifications |
+| `PATCH` | `/api/v1/notifications/{id}/read` | Bearer Token | Mark notification as read |
+| `PATCH` | `/api/v1/notifications/read-all` | Bearer Token | Mark all notifications as read |
+| `DELETE` | `/api/v1/notifications/{id}` | Bearer Token | Dismiss notification |
+| `GET` | `/api/v1/conversations` | Bearer Token | List conversations for user |
+| `POST` | `/api/v1/conversations` | Bearer Token | Create or find direct conversation |
+| `GET` | `/api/v1/conversations/{id}/messages` | Bearer Token | Get conversation messages |
+| `POST` | `/api/v1/conversations/{id}/messages` | Bearer Token | Post a message to conversation |
+
+---
+
+## 🧪 Testing & Verification
+
+### Backend Automated Test Suite
+The backend contains automated tests verifying JWT security, user registration, project isolation, authorization checks, and task status lifecycles.
+
+To run the backend test suite:
+```powershell
+cd backend
+.\mvnw.cmd test
+```
+*Current Status: 6/6 tests passing (0 failures, 0 errors).*
+
+To package the production standalone executable JAR:
+```powershell
+cd backend
+.\mvnw.cmd package -DskipTests
+```
+*Generated output: `backend/target/flowsync-backend-1.0.0.jar`*
+
+### Frontend Lint and Build Verification
+```powershell
+cd frontend
+npm run lint
+npm run build
+```
+*Current Status: 0 errors, build succeeds in under 600ms.*
+
+---
+
+## 🔒 Security & Best Practices
+
+- **Zero Hardcoded Secrets**: Secrets and database credentials are fully configurable via environment variables.
+- **Stateless Bearer JWT Authentication**: Fast, horizontally scalable token verification with BCrypt encrypted passwords.
+- **Server-Side Authorization**: Project and task modification permissions are strictly validated in the Spring Boot service layer, protecting APIs against unauthorized client requests.
+- **Transactional Integrity**: All database mutation operations are wrapped in `@Transactional` blocks to guarantee consistency.
+- **SQL Injection Prevention**: Spring Data JPA and Hibernate use parameterized queries across all entities.
 
 ---
 
 ## 🧑‍💻 Developed by
 
-**Vithun S K**
-
-Frontend Web Developer | Full Stack Learner
-
-📧 Email: [vithunkumar07@gmail.com](mailto:vithunkumar07@gmail.com)
-
-🔗 LinkedIn: [https://www.linkedin.com/in/vithun-sk/](https://www.linkedin.com/in/vithun-sk/)
-
+**Vithun S K**  
+Frontend Web Developer \| Full Stack Learner  
+📧 Email: [vithunkumar07@gmail.com](mailto:vithunkumar07@gmail.com)  
+🔗 LinkedIn: [https://www.linkedin.com/in/vithun-sk/](https://www.linkedin.com/in/vithun-sk/)  
 🐙 GitHub: [https://github.com/vithun-sk](https://github.com/vithun-sk)

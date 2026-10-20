@@ -1,4 +1,6 @@
 import { API_BASE_URL } from "@/config/env";
+import { STORAGE_KEYS } from "@/constants";
+import { readJSON } from "@/lib/storage";
 
 export class ApiError extends Error {
   constructor(message, { status = 0, details = null } = {}) {
@@ -9,10 +11,17 @@ export class ApiError extends Error {
   }
 }
 
+function getStoredToken() {
+  const session = readJSON(STORAGE_KEYS.SESSION, null);
+  return session?.token || null;
+}
+
 export async function apiRequest(path, { method = "GET", body, token } = {}) {
   if (!API_BASE_URL) {
     throw new ApiError("API base URL is not configured.", { status: 0 });
   }
+
+  const effectiveToken = token !== undefined ? token : getStoredToken();
 
   const headers = {
     Accept: "application/json",
@@ -22,8 +31,8 @@ export async function apiRequest(path, { method = "GET", body, token } = {}) {
     headers["Content-Type"] = "application/json";
   }
 
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  if (effectiveToken) {
+    headers.Authorization = `Bearer ${effectiveToken}`;
   }
 
   let response;
@@ -34,7 +43,9 @@ export async function apiRequest(path, { method = "GET", body, token } = {}) {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new ApiError("Unable to reach the API server.", { status: 0 });
+    throw new ApiError("Unable to reach the API server. Please check your network connection or server status.", {
+      status: 0,
+    });
   }
 
   const contentType = response.headers.get("content-type") || "";
@@ -42,11 +53,27 @@ export async function apiRequest(path, { method = "GET", body, token } = {}) {
   const payload = isJson ? await response.json().catch(() => null) : await response.text();
 
   if (!response.ok) {
-    const message =
-      payload?.message ||
-      payload?.error ||
-      `Request failed with status ${response.status}.`;
-    throw new ApiError(message, { status: response.status, details: payload });
+    let message = `Request failed with status ${response.status}.`;
+    let details = null;
+
+    if (payload && typeof payload === "object") {
+      message = payload.error || payload.message || message;
+      details = payload.details || null;
+    } else if (typeof payload === "string" && payload.trim()) {
+      message = payload.trim();
+    }
+
+    if (response.status === 401) {
+      message = message || "Session expired or unauthenticated. Please sign in again.";
+    } else if (response.status === 403) {
+      message = message || "You do not have permission to perform this action.";
+    }
+
+    throw new ApiError(message, { status: response.status, details });
+  }
+
+  if (payload && typeof payload === "object" && "data" in payload) {
+    return payload.data;
   }
 
   return payload;

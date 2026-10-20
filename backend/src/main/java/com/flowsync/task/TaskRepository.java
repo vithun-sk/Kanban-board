@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface TaskRepository extends JpaRepository<Task, String> {
@@ -17,10 +18,13 @@ public interface TaskRepository extends JpaRepository<Task, String> {
 
     int countByProjectIdAndStatus(String projectId, TaskStatus status);
 
-    @Query("SELECT DISTINCT t FROM Task t LEFT JOIN t.labels l WHERE t.project.id = :projectId ORDER BY t.createdAt DESC")
+    @Query("SELECT DISTINCT t FROM Task t LEFT JOIN FETCH t.labels l WHERE t.project.id = :projectId ORDER BY t.createdAt DESC")
     List<Task> findByProjectIdWithLabels(@Param("projectId") String projectId);
 
-    @Query("SELECT DISTINCT t FROM Task t LEFT JOIN t.labels l WHERE t.project.createdBy.id = :userId OR EXISTS (SELECT m FROM ProjectMember m WHERE m.project.id = t.project.id AND m.user.id = :userId) ORDER BY t.createdAt DESC")
+    @Query("SELECT DISTINCT t FROM Task t JOIN FETCH t.project p JOIN FETCH p.createdBy LEFT JOIN FETCH t.labels l WHERE t.id = :id")
+    Optional<Task> findByIdWithProject(@Param("id") String id);
+
+    @Query("SELECT DISTINCT t FROM Task t LEFT JOIN FETCH t.labels l WHERE t.project.createdBy.id = :userId OR EXISTS (SELECT m FROM ProjectMember m WHERE m.project.id = t.project.id AND m.user.id = :userId) ORDER BY t.createdAt DESC")
     List<Task> findAccessibleTasks(@Param("userId") String userId);
 
     @Query("SELECT DISTINCT t FROM Task t WHERE t.dueDate IS NOT NULL AND t.dueDate BETWEEN :startDate AND :endDate AND (t.project.createdBy.id = :userId OR EXISTS (SELECT m FROM ProjectMember m WHERE m.project.id = t.project.id AND m.user.id = :userId)) ORDER BY t.dueDate ASC")

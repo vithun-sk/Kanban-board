@@ -14,7 +14,7 @@ export function clearSession() {
   removeItem(STORAGE_KEYS.SESSION);
 }
 
-function saveSession(user) {
+function saveSession(user, token = null, demo = true) {
   const session = {
     user: {
       id: user.id,
@@ -24,7 +24,8 @@ function saveSession(user) {
       role: user.role || "Member",
       title: user.title || "Workspace member",
     },
-    demo: true,
+    token: token || null,
+    demo,
     startedAt: new Date().toISOString(),
   };
   writeJSON(STORAGE_KEYS.SESSION, session);
@@ -61,9 +62,10 @@ export async function login({ email, password, members = [] }) {
   if (!isDemoMode()) {
     const payload = await apiRequest(endpoints.login, {
       method: "POST",
-      body: { email, password },
+      body: { email: email.trim(), password },
     });
-    return { ok: true, session: payload, demo: false };
+    const session = saveSession(payload.user, payload.token, false);
+    return { ok: true, session, demo: false };
   }
 
   const existing = members.find(
@@ -79,6 +81,8 @@ export async function login({ email, password, members = [] }) {
       role: "Member",
       title: "Demo session",
     },
+    null,
+    true,
   );
 
   return {
@@ -98,19 +102,24 @@ export async function register({ name, email, password, confirmPassword }) {
   if (!isDemoMode()) {
     const payload = await apiRequest(endpoints.register, {
       method: "POST",
-      body: { name, email, password },
+      body: { name: name.trim(), email: email.trim(), password },
     });
-    return { ok: true, session: payload, demo: false };
+    const session = saveSession(payload.user, payload.token, false);
+    return { ok: true, session, demo: false };
   }
 
-  const session = saveSession({
-    id: "demo-user",
-    name: name.trim(),
-    email: email.trim(),
-    initials: getInitials(name),
-    role: "Member",
-    title: "Demo session",
-  });
+  const session = saveSession(
+    {
+      id: "demo-user",
+      name: name.trim(),
+      email: email.trim(),
+      initials: getInitials(name),
+      role: "Member",
+      title: "Demo session",
+    },
+    null,
+    true,
+  );
 
   return {
     ok: true,
@@ -121,13 +130,17 @@ export async function register({ name, email, password, confirmPassword }) {
   };
 }
 
+export async function fetchMe() {
+  if (isDemoMode()) return null;
+  return apiRequest(endpoints.me);
+}
+
 export async function logout() {
   if (!isDemoMode()) {
     try {
       await apiRequest(endpoints.logout, { method: "POST" });
     } catch {
-      clearSession();
-      throw new Error("Unable to end the API session.");
+      // Ignore network failures on logout
     }
   }
   clearSession();

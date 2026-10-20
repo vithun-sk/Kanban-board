@@ -8,7 +8,17 @@ export async function listNotifications() {
   return apiRequest(endpoints.notifications);
 }
 
-export async function updateNotification(id, payload) {
-  if (isDemoMode()) return { demo: true, id, payload };
-  return apiRequest(endpoints.notification(id), { method: "PATCH", body: payload });
+export async function markNotificationReadApi(id) {
+  if (isDemoMode()) return { demo: true, id };
+  return apiRequest(endpoints.notificationRead(id), { method: "PATCH" });
+}
+
+export async function markAllNotificationsReadApi() {
+  if (isDemoMode()) return { demo: true };
+  return apiRequest(endpoints.notificationsReadAll, { method: "POST" });
+}
+
+export async function dismissNotificationApi(id) {
+  if (isDemoMode()) return { demo: true, id };
+  return apiRequest(endpoints.notification(id), { method: "DELETE" });
 }

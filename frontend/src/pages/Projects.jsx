@@ -165,7 +165,7 @@ const Projects = () => {
             onCancel={() => setEditing(null)}
             onSubmit={async (payload) => {
               updateProject(editing.id, payload);
-              push("Project updated in the demo workspace.");
+              push("Project updated successfully.");
               setEditing(null);
             }}
           />
@@ -175,13 +175,13 @@ const Projects = () => {
       {deleting ? (
         <ConfirmDialog
           title={`Delete ${deleting.name}?`}
-          description="This also removes tasks in this project from the demo workspace."
+          description="This will permanently delete this project and all of its tasks."
           confirmLabel="Delete project"
           destructive
           onClose={() => setDeleting(null)}
           onConfirm={() => {
             deleteProject(deleting.id);
-            push("Project deleted from the demo workspace.");
+            push("Project deleted successfully.");
             setDeleting(null);
           }}
         />

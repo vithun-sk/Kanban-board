@@ -20,7 +20,7 @@ const ProjectCreate = () => {
       />
       <h1 className="text-3xl font-bold">Create project</h1>
       <p className="mt-2 mb-8 text-[var(--on-surface-variant)]">
-        Add a project to this browser's demo workspace.
+        Add a new project to your workspace.
       </p>
       <div className="rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container)] p-6">
         <ProjectForm
@@ -30,7 +30,7 @@ const ProjectCreate = () => {
           onSubmit={async (payload) => {
             const project = await createProject(payload);
             if (project) {
-              push("Project saved in the demo workspace.");
+              push("Project created successfully.");
               navigate(`/projects/${project.id}`);
             }
           }}

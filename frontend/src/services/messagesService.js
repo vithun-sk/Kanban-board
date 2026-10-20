@@ -8,6 +8,14 @@ export async function listConversations() {
   return apiRequest(endpoints.conversations);
 }
 
+export async function createConversationApi(participantIds, title) {
+  if (isDemoMode()) return { demo: true, participantIds, title };
+  return apiRequest(endpoints.conversations, {
+    method: "POST",
+    body: { participantIds, title },
+  });
+}
+
 export async function listMessages(conversationId) {
   if (isDemoMode()) {
     return getDemoState().messages.filter((message) => message.conversationId === conversationId);
@@ -17,5 +25,8 @@ export async function listMessages(conversationId) {
 
 export async function postMessage(conversationId, body) {
   if (isDemoMode()) return { demo: true, conversationId, body };
-  return apiRequest(endpoints.messages(conversationId), { method: "POST", body: { body } });
+  return apiRequest(endpoints.messages(conversationId), {
+    method: "POST",
+    body: { body },
+  });
 }

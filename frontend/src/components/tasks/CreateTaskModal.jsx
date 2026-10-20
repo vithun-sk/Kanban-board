@@ -9,7 +9,7 @@ const CreateTaskModal = ({ onClose, projectId }) => {
   return (
     <Modal
       title="Create task"
-      description="Add a task to the shared demo workspace."
+      description="Add a task to your project workspace."
       onClose={onClose}
       closeOnBackdrop={false}
     >

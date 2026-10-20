@@ -12,7 +12,7 @@ import { isValidEmail } from "@/lib/validation";
 
 const Teams = () => {
   const navigate = useNavigate();
-  const { members, tasks, addMember, updateMember, removeMember, createConversation } = useApp();
+  const { members, tasks, addMember, updateMember, removeMember, createConversation, isDemoMode } = useApp();
   const { push } = useToast();
   const [search, setSearch] = useState("");
   const [role, setRole] = useState("All");
@@ -49,7 +49,7 @@ const Teams = () => {
     setErrors(next);
     if (Object.keys(next).length) return;
     addMember({ name, email, role: inviteRole });
-    push("Member added locally. No invitation email was sent.");
+    push(isDemoMode ? "Member added to demo workspace." : "Member added.");
     setInviteOpen(false);
     setName("");
     setEmail("");
@@ -62,7 +62,9 @@ const Teams = () => {
         <div>
           <h1 className="text-3xl font-bold">Team</h1>
           <p className="mt-2 text-[var(--on-surface-variant)]">
-            Demo members for this workspace. Roles are labels only and are not enforced as permissions.
+            {isDemoMode
+              ? "Demo members for this workspace. Roles are labels only and are not enforced as permissions."
+              : "Workspace members directory. Manage members, roles, and assignments across your projects."}
           </p>
         </div>
         <button
@@ -140,7 +142,11 @@ const Teams = () => {
       {inviteOpen ? (
         <Modal
           title="Add member"
-          description="This only adds a local demo profile. No email is sent."
+          description={
+            isDemoMode
+              ? "This adds a local demo profile. No email is sent."
+              : "Add a new member to the workspace directory."
+          }
           onClose={() => setInviteOpen(false)}
           closeOnBackdrop={false}
         >
@@ -168,7 +174,7 @@ const Teams = () => {
                 Cancel
               </button>
               <button type="submit" className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm text-white">
-                Add locally
+                {isDemoMode ? "Add locally" : "Add member"}
               </button>
             </div>
           </form>
@@ -197,7 +203,7 @@ const Teams = () => {
               type="button"
               onClick={() => {
                 updateMember(editing.id, { role: editing.role });
-                push("Role updated locally. This is not a security permission.");
+                push(isDemoMode ? "Role updated in demo workspace." : "Member role updated.");
                 setEditing(null);
               }}
               className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm text-white"
@@ -221,7 +227,7 @@ const Teams = () => {
               navigate("/messages");
             }}
           >
-            Open demo conversation
+            {isDemoMode ? "Open demo conversation" : "Send message"}
           </button>
         </Modal>
       ) : null}
@@ -229,13 +235,13 @@ const Teams = () => {
       {removing ? (
         <ConfirmDialog
           title={`Remove ${removing.name}?`}
-          description="They will be removed from this demo workspace and unassigned from tasks."
+          description="They will be removed from this workspace and unassigned from tasks."
           confirmLabel="Remove member"
           destructive
           onClose={() => setRemoving(null)}
           onConfirm={() => {
             removeMember(removing.id);
-            push("Member removed from the demo workspace.");
+            push("Member removed.");
             setRemoving(null);
           }}
         />

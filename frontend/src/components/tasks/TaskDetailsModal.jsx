@@ -145,7 +145,7 @@ const TaskDetailsModal = ({
       {confirmDelete ? (
         <ConfirmDialog
           title="Delete this task?"
-          description="This removes the task from the demo workspace. You can reset demo data later from Settings."
+          description="This will permanently delete this task from the project."
           confirmLabel="Delete task"
           destructive
           onClose={() => setConfirmDelete(false)}

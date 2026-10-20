@@ -12,12 +12,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional(readOnly = true)
 public class TaskService {
 
     private final TaskRepository taskRepository;
@@ -60,7 +60,7 @@ public class TaskService {
     }
 
     public TaskDto getTaskById(String taskId, String userId) {
-        Task task = taskRepository.findById(taskId)
+        Task task = taskRepository.findByIdWithProject(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found."));
         projectService.validateProjectAccess(task.getProject(), userId);
         return TaskDto.fromEntity(task);
@@ -118,7 +118,7 @@ public class TaskService {
 
     @Transactional
     public TaskDto updateTask(String taskId, UpdateTaskRequest request, String userId) {
-        Task task = taskRepository.findById(taskId)
+        Task task = taskRepository.findByIdWithProject(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found."));
         projectService.validateProjectAccess(task.getProject(), userId);
 
@@ -171,7 +171,7 @@ public class TaskService {
 
     @Transactional
     public TaskDto updateTaskStatus(String taskId, UpdateTaskStatusRequest request, String userId) {
-        Task task = taskRepository.findById(taskId)
+        Task task = taskRepository.findByIdWithProject(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found."));
         projectService.validateProjectAccess(task.getProject(), userId);
 
@@ -182,7 +182,7 @@ public class TaskService {
 
     @Transactional
     public void deleteTask(String taskId, String userId) {
-        Task task = taskRepository.findById(taskId)
+        Task task = taskRepository.findByIdWithProject(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found."));
         projectService.validateProjectAccess(task.getProject(), userId);
 
