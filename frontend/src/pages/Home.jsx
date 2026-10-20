@@ -1,137 +1,225 @@
-import React, { useEffect, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import Sidebar from "@/components/layouts/Sidebar";
-import Topbar from "@/components/layouts/Topbar";
 import StatCard from "@/components/dashboard/StatCard";
 import ProjectCard from "@/components/projects/ProjectCard";
 import TaskRow from "@/components/tasks/TaskRow";
-import { projects } from "@/Data/projectsData";
-import { tasks } from "@/Data/tasksData";
 import TaskDetailsModal from "@/components/tasks/TaskDetailsModal";
+import CreateTaskModal from "@/components/tasks/CreateTaskModal";
+import EmptyState from "@/components/ui/EmptyState";
+import { useApp } from "@/context/AppContext";
+import { CURRENT_USER_ID, TASK_STATUS } from "@/constants";
+import { compareISODates, formatDate, todayISO } from "@/lib/dates";
 
 const Home = () => {
   const navigate = useNavigate();
+  const { currentUser, projects, tasks, activity, metrics, members, updateTask, deleteTask } = useApp();
   const [selectedTask, setSelectedTask] = useState(null);
-  const [currentDate, setCurrentDate] = useState();
+  const [showCreate, setShowCreate] = useState(false);
 
-  useEffect(() => {
-    const updateDate = () => {
-      const now = new Date();
+  const dateLabel = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
 
-      const dateOptions = {
-         month: "long",
-        day: "numeric",
-        weekday: "long",
-        year: "numeric",
-       
-      };
+  const myId = currentUser.id === "demo-user" ? CURRENT_USER_ID : currentUser.id;
+  const myTasks = tasks.filter((task) => task.assigneeId === myId).slice(0, 5);
+  const recentProjects = projects.slice(0, 3);
+  const upcoming = useMemo(() => {
+    const today = todayISO();
+    return tasks
+      .filter((task) => task.dueDate && task.status !== TASK_STATUS.DONE && task.dueDate >= today)
+      .sort((a, b) => compareISODates(a.dueDate, b.dueDate))
+      .slice(0, 5);
+  }, [tasks]);
 
-      setCurrentDate(now.toLocaleDateString('en-US' , dateOptions))
-    };
+  const distribution = [
+    { label: "To Do", value: metrics.todo, color: "bg-slate-400" },
+    { label: "In Progress", value: metrics.inProgress, color: "bg-blue-500" },
+    { label: "In Review", value: metrics.inReview, color: "bg-violet-500" },
+    { label: "Done", value: metrics.completed, color: "bg-emerald-500" },
+  ];
+  const total = Math.max(metrics.totalTasks, 1);
 
-    updateDate();
-  }, []);
+  const selected = tasks.find((task) => task.id === selectedTask?.id) || null;
+
   return (
-    <div className="min-h-screen bg-[var(--surface)] text-[var(--on-surface)] flex flex-row">
-      <div>
-        <Sidebar />
-      </div>
-      <main className="min-h-screen min-w-0">
-        <Topbar />
-        {/* Welcome Message */}
-        <div className="p-8">
-          <section className="flex items-start justify-between mb-8">
-            <div>
-              <p className="text-sm text-[var(--outline)] mb-1">
-                {currentDate}
-              </p>
-              <h1 className="text-3xl font-bold">
-                Welcome back, Vithun
-                <span className="ml-2">👋</span>
-              </h1>
-              <p className="text-[var(--on-surface-variant)] mt-2">
-                Here's what's happening across your workspace today.
-              </p>
-            </div>
-            <button
-              onClick={() => navigate("/projects")}
-              className="cursor-pointer flex items-center gap-2 bg-[var(--primary)] text-white px-5 py-2.5 rounded-lg font-medium hover:bg-[#4338CA] transition"
-            >
-              <Plus size={19} />
-              Create Project
-            </button>
-          </section>
-          {/* Stats */}
-          <StatCard />
-          {/* Projects */}
-          <section className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-xl font-semibold">Recent Projects</h2>
-                <p className="text-sm text-[var(--outline)] mt-1">
-                  Your recently active projects
-                </p>
-              </div>
-              <button
-                onClick={() => navigate("/projects")}
-                className="text-sm text-[var(--primary)] hover:opacity-85 cursor-pointer"
-              >
-                View all
-              </button>
-            </div>
-            <div className="grid grid-cols-3 gap-5">
-              {projects.slice(-3).map((project) => (
-                <div key={project.id}>
-                  <ProjectCard project={project} />
-                </div>
-              ))}
-            </div>
-          </section>
-          {/* Tasks */}
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-xl font-semibold">My Tasks</h2>
-                <p className="text-sm text-[var(--outline)] mt-1">
-                  Tasks assigned to you across projects
-                </p>
-              </div>
-
-              <button
-                onClick={() => navigate("/tasks")}
-                className="text-sm text-[var(--primary)] hover:opacity-85 cursor-pointer "
-              >
-                View all
-              </button>
-            </div>
-            <div className="mt-8 overflow-hidden rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container)]">
-              <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-4 border-b border-[var(--outline-variant)] bg-[var(--surface-container-high)] px-5 py-4 text-xs font-semibold uppercase tracking-wide text-[var(--outline)]">
-                <span>Task</span>
-                <span>Status</span>
-                <span>Priority</span>
-                <span>Assignee</span>
-                <span>Due / Comments</span>
-              </div>
-              {tasks.slice(-4).map((task) => (
-                <div
-                  key={task.id}
-                  onClick={() => setSelectedTask(task)}
-                  className="cursor-pointer"
-                >
-                  <TaskRow task={task} />
-                </div>
-              ))}
-            </div>
-          </section>
+    <div>
+      <section className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="mb-1 text-sm text-[var(--outline)]">{dateLabel}</p>
+          <h1 className="text-3xl font-bold">Welcome back, {currentUser.name.split(" ")[0]}</h1>
+          <p className="mt-2 text-[var(--on-surface-variant)]">
+            Here's what's happening across your workspace today.
+          </p>
         </div>
-      </main>
-      {selectedTask && (
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => setShowCreate(true)}
+            className="rounded-lg border border-[var(--outline-variant)] px-4 py-2.5 text-sm font-medium"
+          >
+            Create task
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/projects/create")}
+            className="flex items-center gap-2 rounded-lg bg-[var(--primary)] px-5 py-2.5 font-medium text-white hover:bg-[#4338CA]"
+          >
+            <Plus size={19} />
+            Create project
+          </button>
+        </div>
+      </section>
+
+      <StatCard metrics={metrics} />
+
+      <section className="mb-8 grid gap-5 lg:grid-cols-[2fr_1fr]">
+        <div className="rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container)] p-5">
+          <h2 className="text-lg font-semibold">Task status</h2>
+          <div className="mt-4 flex h-3 overflow-hidden rounded-full bg-[var(--surface-container-highest)]">
+            {distribution.map((item) => (
+              <div
+                key={item.label}
+                className={item.color}
+                style={{ width: `${(item.value / total) * 100}%` }}
+                title={`${item.label}: ${item.value}`}
+              />
+            ))}
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+            {distribution.map((item) => (
+              <div key={item.label} className="flex items-center gap-2">
+                <span className={`h-2.5 w-2.5 rounded-full ${item.color}`} />
+                {item.label} ({item.value})
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container)] p-5">
+          <h2 className="text-lg font-semibold">Upcoming deadlines</h2>
+          {upcoming.length === 0 ? (
+            <p className="mt-4 text-sm text-[var(--outline)]">No upcoming due dates.</p>
+          ) : (
+            <ul className="mt-4 space-y-3">
+              {upcoming.map((task) => (
+                <li key={task.id}>
+                  <button
+                    type="button"
+                    className="w-full text-left text-sm hover:text-[var(--primary)]"
+                    onClick={() => setSelectedTask(task)}
+                  >
+                    <p className="font-medium">{task.title}</p>
+                    <p className="text-xs text-[var(--outline)]">
+                      {formatDate(task.dueDate)} · {task.projectName}
+                    </p>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      <section className="mb-8">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">Recent projects</h2>
+            <p className="mt-1 text-sm text-[var(--outline)]">Your recently active projects</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate("/projects")}
+            className="text-sm text-[var(--primary)]"
+          >
+            View all
+          </button>
+        </div>
+        {recentProjects.length === 0 ? (
+          <EmptyState
+            title="No projects yet"
+            description="Create a project to start organizing work."
+            action={
+              <button
+                type="button"
+                onClick={() => navigate("/projects/create")}
+                className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm text-white"
+              >
+                Create project
+              </button>
+            }
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {recentProjects.map((project) => (
+              <ProjectCard
+                key={project.id}
+                project={project}
+                onOpen={() => navigate(`/projects/${project.id}`)}
+                onEdit={() => navigate(`/projects/${project.id}?edit=1`)}
+                onDelete={() => navigate(`/projects/${project.id}`)}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mb-8">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">My tasks</h2>
+            <p className="mt-1 text-sm text-[var(--outline)]">Tasks assigned to you</p>
+          </div>
+          <button type="button" onClick={() => navigate("/tasks")} className="text-sm text-[var(--primary)]">
+            View all
+          </button>
+        </div>
+        {myTasks.length === 0 ? (
+          <EmptyState title="No assigned tasks" description="Tasks assigned to you will appear here." />
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container)]">
+            <div className="hidden grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-4 border-b border-[var(--outline-variant)] bg-[var(--surface-container-high)] px-5 py-4 text-xs font-semibold uppercase tracking-wide text-[var(--outline)] md:grid">
+              <span>Task</span>
+              <span>Status</span>
+              <span>Priority</span>
+              <span>Assignee</span>
+              <span>Due</span>
+            </div>
+            {myTasks.map((task) => (
+              <TaskRow key={task.id} task={task} onClick={setSelectedTask} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-4 text-xl font-semibold">Recent activity</h2>
+        {activity.length === 0 ? (
+          <p className="text-sm text-[var(--outline)]">No activity yet.</p>
+        ) : (
+          <ul className="space-y-3">
+            {activity.slice(0, 6).map((item) => (
+              <li key={item.id} className="rounded-lg border border-[var(--outline-variant)] px-4 py-3 text-sm">
+                {item.message}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {selected ? (
         <TaskDetailsModal
-          task={selectedTask}
+          task={selected}
+          members={members}
+          projects={projects}
           onClose={() => setSelectedTask(null)}
+          onSave={updateTask}
+          onDelete={deleteTask}
         />
-      )}
+      ) : null}
+      {showCreate ? <CreateTaskModal onClose={() => setShowCreate(false)} /> : null}
     </div>
   );
 };

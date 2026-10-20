@@ -1,106 +1,114 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { Button } from "./ui/button";
 import { useNavigate } from "react-router-dom";
+import { register, validateRegister } from "@/services/authService";
+import { useApp } from "@/context/AppContext";
+import { isDemoMode } from "@/config/env";
+import { Field, inputClass } from "@/components/ui/Field";
+import { passwordGuidance } from "@/lib/validation";
 
 const SignupCard = () => {
   const navigate = useNavigate();
+  const { refreshSession } = useApp();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [formError, setFormError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const strength = useMemo(() => passwordGuidance(password), [password]);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setFormError("");
+    const { errors: nextErrors } = validateRegister({ name, email, password, confirmPassword });
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
+    setLoading(true);
+    try {
+      const result = await register({ name, email, password, confirmPassword });
+      if (!result.ok) {
+        setErrors(result.errors || {});
+        return;
+      }
+      refreshSession();
+      navigate("/home", { replace: true, state: { demoNotice: result.message } });
+    } catch (error) {
+      setFormError(error.message || "Unable to start a demo session.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="bg-[var(--surface)] w-[80%] border border-[var(--on-primary-container)] border-t-10 rounded-xl text-center p-7">
+    <div className="w-[min(100%,28rem)] rounded-xl border border-[var(--on-primary-container)] border-t-8 bg-[var(--surface)] p-7 text-center">
       <div className="text-2xl text-[var(--on-surface)]">
         Flow<span className="font-black text-[var(--primary)]">Sync</span>
       </div>
-
-      <h1 className="font-bold text-4xl text-[var(--on-surface)] p-2">
-        Create Account
-      </h1>
-
-      <p className="text-sm">Create your account and start collaborating</p>
-
-      <form className="mt-8">
-        {/* Full Name */}
-        <div className="flex flex-col gap-1 mx-10">
-          <label htmlFor="name" className="text-xs font-semibold text-left">
-            FULL NAME
-          </label>
-
+      <h1 className="p-2 text-3xl font-bold sm:text-4xl">Create account</h1>
+      <p className="text-sm">Start a local demo workspace</p>
+      {isDemoMode() ? (
+        <p className="mt-3 rounded-lg bg-[var(--primary-container)] px-3 py-2 text-xs text-[var(--on-primary-container)]">
+          Demo mode: this does not create a server account. Your password is never stored.
+        </p>
+      ) : null}
+      <form className="mt-6 space-y-4" onSubmit={handleSubmit} noValidate>
+        <Field label="Full name" htmlFor="name" error={errors.name}>
+          <input id="name" value={name} onChange={(event) => setName(event.target.value)} className={inputClass} />
+        </Field>
+        <Field label="Email address" htmlFor="email" error={errors.email}>
+          <input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} className={inputClass} />
+        </Field>
+        <Field label="Password" htmlFor="password" error={errors.password}>
+          <div className="relative">
+            <input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className={`${inputClass} pr-10`}
+            />
+            <button
+              type="button"
+              className="absolute right-3 top-1/2 -translate-y-1/2"
+              onClick={() => setShowPassword((value) => !value)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+          <ul className="mt-2 space-y-1 text-left text-xs">
+            {strength.rules.map((rule) => (
+              <li key={rule.id} className={rule.ok ? "text-emerald-600" : "text-[var(--outline)]"}>
+                {rule.label}
+              </li>
+            ))}
+          </ul>
+        </Field>
+        <Field label="Confirm password" htmlFor="confirmPassword" error={errors.confirmPassword}>
           <input
-            type="text"
-            name="name"
-            id="name"
-            placeholder="Enter your full name"
-            className="w-full p-2 rounded-xl border-2 border-[gray] pl-3"
-          />
-        </div>
-
-        {/* Email */}
-        <div className="flex flex-col gap-1 mt-5 mx-10">
-          <label htmlFor="email" className="text-xs font-semibold text-left">
-            EMAIL ADDRESS
-          </label>
-
-          <input
-            type="email"
-            name="email"
-            id="email"
-            placeholder="Enter your email"
-            className="w-full p-2 rounded-xl border-2 border-[gray] pl-3"
-          />
-        </div>
-
-        {/* Password */}
-        <div className="flex flex-col gap-1 mt-5 mx-10">
-          <label htmlFor="password" className="text-xs font-semibold text-left">
-            PASSWORD
-          </label>
-
-          <input
-            type="password"
-            name="password"
-            id="password"
-            placeholder="Create a password"
-            className="w-full p-2 rounded-xl border-2 border-[gray] pl-3"
-          />
-        </div>
-
-        {/* Confirm Password */}
-        <div className="flex flex-col gap-1 mt-5 mx-10">
-          <label
-            htmlFor="confirmPassword"
-            className="text-xs font-semibold text-left"
-          >
-            CONFIRM PASSWORD
-          </label>
-
-          <input
-            type="password"
-            name="confirmPassword"
             id="confirmPassword"
-            placeholder="Confirm your password"
-            className="w-full p-2 rounded-xl border-2 border-[gray] pl-3"
+            type={showPassword ? "text" : "password"}
+            value={confirmPassword}
+            onChange={(event) => setConfirmPassword(event.target.value)}
+            className={inputClass}
           />
-        </div>
-
-        {/* Create Account Button */}
-        <Button
-          type="button"
-          className="p-5 text-lg w-[85%] m-5 rounded-xl cursor-pointer transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#4338CA] hover:shadow-lg"
-          onClick={() => navigate("/login")}
-        >
-          Create Account
+        </Field>
+        {formError ? <p className="text-sm text-[var(--error)]">{formError}</p> : null}
+        <Button type="submit" disabled={loading} className="h-11 w-full rounded-xl text-lg">
+          {loading ? "Starting demo..." : "Continue in demo"}
         </Button>
       </form>
-
-      {/* Login Redirect */}
-      <div className="mt-2 border-t-2 border-slate-300">
+      <div className="mt-4 border-t border-slate-300">
         <p className="p-3">
-          Already have an account?{" "}
-          <span
-            className="text-[var(--primary)] cursor-pointer text-lg font-medium transition-all duration-200 hover:opacity-80"
-            onClick={() => navigate("/login")}
-          >
+          Already have a session?{" "}
+          <button type="button" className="text-lg font-medium text-[var(--primary)]" onClick={() => navigate("/login")}>
             Login
-          </span>
+          </button>
         </p>
       </div>
     </div>

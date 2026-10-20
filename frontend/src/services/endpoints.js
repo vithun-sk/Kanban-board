@@ -1,0 +1,18 @@
+export const endpoints = {
+  login: "/auth/login",
+  register: "/auth/register",
+  logout: "/auth/logout",
+  me: "/auth/me",
+  profile: "/users/me",
+  projects: "/projects",
+  project: (id) => `/projects/${id}`,
+  tasks: "/tasks",
+  task: (id) => `/tasks/${id}`,
+  taskStatus: (id) => `/tasks/${id}/status`,
+  members: "/members",
+  member: (id) => `/members/${id}`,
+  notifications: "/notifications",
+  notification: (id) => `/notifications/${id}`,
+  conversations: "/conversations",
+  messages: (conversationId) => `/conversations/${conversationId}/messages`,
+};

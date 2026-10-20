@@ -1,16 +1,14 @@
 import React from "react";
-import Banner from "../../../public/banner.png";
 import LoginCard from "@/components/LoginCard";
 
 const Login = () => {
-  
   return (
-    <div className="h-screen flex bg-[var(--surface-bright)]">
-      <section className="w-[50%] slide-right">
-        <img src={Banner} alt="image" className="w-full h-full object-cover"/>
+    <div className="flex min-h-screen flex-col bg-[var(--surface-bright)] lg:flex-row">
+      <section className="hidden lg:block lg:w-1/2">
+        <img src="/banner.png" alt="FlowSync workspace preview" className="h-full w-full object-cover" />
       </section>
-      <section className="w-[50%] flex justify-center items-center  slide-left">
-        <LoginCard/>
+      <section className="flex flex-1 items-center justify-center p-6">
+        <LoginCard />
       </section>
     </div>
   );
