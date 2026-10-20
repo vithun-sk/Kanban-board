@@ -3,19 +3,38 @@ import { Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import StatCard from "@/components/dashboard/StatCard";
 import ProjectCard from "@/components/projects/ProjectCard";
+import ProjectForm from "@/components/projects/ProjectForm";
+import Modal from "@/components/ui/Modal";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import TaskRow from "@/components/tasks/TaskRow";
 import TaskDetailsModal from "@/components/tasks/TaskDetailsModal";
 import CreateTaskModal from "@/components/tasks/CreateTaskModal";
 import EmptyState from "@/components/ui/EmptyState";
 import { useApp } from "@/context/AppContext";
+import { useToast } from "@/context/ToastContext";
 import { CURRENT_USER_ID, TASK_STATUS } from "@/constants";
 import { compareISODates, formatDate, todayISO } from "@/lib/dates";
 
 const Home = () => {
   const navigate = useNavigate();
-  const { currentUser, projects, tasks, activity, metrics, members, updateTask, deleteTask } = useApp();
+  const {
+    currentUser,
+    projects,
+    tasks,
+    activity,
+    metrics,
+    members,
+    updateProject,
+    deleteProject,
+    updateTask,
+    deleteTask,
+    submitting,
+  } = useApp();
+  const { push } = useToast();
   const [selectedTask, setSelectedTask] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
+  const [deletingProject, setDeletingProject] = useState(null);
 
   const dateLabel = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -59,14 +78,14 @@ const Home = () => {
           <button
             type="button"
             onClick={() => setShowCreate(true)}
-            className="rounded-lg border border-[var(--outline-variant)] px-4 py-2.5 text-sm font-medium"
+            className="rounded-lg border border-[var(--outline-variant)] px-4 py-2.5 text-sm font-medium transition hover:bg-[var(--surface-container)]"
           >
             Create task
           </button>
           <button
             type="button"
             onClick={() => navigate("/projects/create")}
-            className="flex items-center gap-2 rounded-lg bg-[var(--primary)] px-5 py-2.5 font-medium text-white hover:bg-[#4338CA]"
+            className="flex items-center gap-2 rounded-lg bg-[var(--primary)] px-5 py-2.5 font-medium text-white transition hover:bg-[#4338CA]"
           >
             <Plus size={19} />
             Create project
@@ -132,7 +151,7 @@ const Home = () => {
           <button
             type="button"
             onClick={() => navigate("/projects")}
-            className="text-sm text-[var(--primary)]"
+            className="text-sm text-[var(--primary)] hover:underline"
           >
             View all
           </button>
@@ -158,8 +177,8 @@ const Home = () => {
                 key={project.id}
                 project={project}
                 onOpen={() => navigate(`/projects/${project.id}`)}
-                onEdit={() => navigate(`/projects/${project.id}?edit=1`)}
-                onDelete={() => navigate(`/projects/${project.id}`)}
+                onEdit={() => setEditingProject(project)}
+                onDelete={() => setDeletingProject(project)}
               />
             ))}
           </div>
@@ -172,7 +191,7 @@ const Home = () => {
             <h2 className="text-xl font-semibold">My tasks</h2>
             <p className="mt-1 text-sm text-[var(--outline)]">Tasks assigned to you</p>
           </div>
-          <button type="button" onClick={() => navigate("/tasks")} className="text-sm text-[var(--primary)]">
+          <button type="button" onClick={() => navigate("/tasks")} className="text-sm text-[var(--primary)] hover:underline">
             View all
           </button>
         </div>
@@ -208,6 +227,36 @@ const Home = () => {
           </ul>
         )}
       </section>
+
+      {editingProject ? (
+        <Modal title="Edit project" onClose={() => setEditingProject(null)} closeOnBackdrop={false}>
+          <ProjectForm
+            initial={editingProject}
+            submitting={submitting}
+            onCancel={() => setEditingProject(null)}
+            onSubmit={async (payload) => {
+              await updateProject(editingProject.id, payload);
+              push("Project updated.");
+              setEditingProject(null);
+            }}
+          />
+        </Modal>
+      ) : null}
+
+      {deletingProject ? (
+        <ConfirmDialog
+          title={`Delete ${deletingProject.name}?`}
+          description="This will remove the project and its associated tasks from the workspace."
+          confirmLabel="Delete project"
+          destructive
+          onClose={() => setDeletingProject(null)}
+          onConfirm={async () => {
+            await deleteProject(deletingProject.id);
+            push("Project deleted.");
+            setDeletingProject(null);
+          }}
+        />
+      ) : null}
 
       {selected ? (
         <TaskDetailsModal

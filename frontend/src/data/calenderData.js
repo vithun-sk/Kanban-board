@@ -2,7 +2,7 @@ export const calendarEvents = [
   {
     id: "event-1",
     title: "API Integration",
-    description: "Complete backend API integration.",
+    description: "Complete backend Spring Boot REST API integration.",
     date: "2026-08-19",
     type: "task",
     project: "FlowSync",
@@ -17,7 +17,7 @@ export const calendarEvents = [
     type: "meeting",
     project: "FlowSync",
     priority: "Medium",
-    status: "Scheduled",
+    status: "In Review",
   },
   {
     id: "event-3",
@@ -27,7 +27,7 @@ export const calendarEvents = [
     type: "deadline",
     project: "Portfolio Website",
     priority: "High",
-    status: "Pending",
+    status: "To Do",
   },
   {
     id: "event-4",
@@ -37,12 +37,12 @@ export const calendarEvents = [
     type: "meeting",
     project: "FlowSync",
     priority: "Low",
-    status: "Scheduled",
+    status: "To Do",
   },
   {
     id: "event-5",
     title: "Database Setup",
-    description: "Complete MongoDB database structure.",
+    description: "Complete MySQL database structure and migrations.",
     date: "2026-08-27",
     type: "task",
     project: "E-Commerce Platform",

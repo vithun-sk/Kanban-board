@@ -12,7 +12,7 @@ import { PROJECT_STATUS_LIST } from "@/constants";
 
 const Projects = () => {
   const navigate = useNavigate();
-  const { projects, createProject, updateProject, deleteProject, submitting } = useApp();
+  const { projects, updateProject, deleteProject, submitting } = useApp();
   const { push } = useToast();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");

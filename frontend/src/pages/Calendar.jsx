@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import CreateTaskModal from "@/components/tasks/CreateTaskModal";
 import TaskDetailsModal from "@/components/tasks/TaskDetailsModal";
+import Modal from "@/components/ui/Modal";
 import { useApp } from "@/context/AppContext";
 import { isOverdue, isSameDay, parseISODate } from "@/lib/dates";
 import { TASK_STATUS } from "@/constants";
@@ -23,24 +24,35 @@ const Calendar = () => {
   );
   const today = new Date();
 
+  const dayTaskMap = useMemo(() => {
+    const map = new Map();
+    for (let day = 1; day <= daysInMonth; day++) {
+      const cell = new Date(year, month, day);
+      const matches = tasks.filter((task) => {
+        const due = parseISODate(task.dueDate);
+        return due && isSameDay(due, cell);
+      });
+      map.set(day, matches);
+    }
+    return map;
+  }, [tasks, year, month, daysInMonth]);
+
   const getTasksForDay = (day) => {
     if (!day) return [];
-    const cell = new Date(year, month, day);
-    return tasks.filter((task) => {
-      const due = parseISODate(task.dueDate);
-      return due && isSameDay(due, cell);
-    });
+    return dayTaskMap.get(day) || [];
   };
 
   const selectedEvents = useMemo(() => {
     if (!selectedDate) return [];
-    return getTasksForDay(selectedDate);
-  }, [selectedDate, month, year, tasks]);
+    return dayTaskMap.get(selectedDate) || [];
+  }, [selectedDate, dayTaskMap]);
 
-  const upcoming = tasks
-    .filter((task) => task.dueDate && task.status !== TASK_STATUS.DONE)
-    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
-    .slice(0, 3);
+  const upcoming = useMemo(() => {
+    return tasks
+      .filter((task) => task.dueDate && task.status !== TASK_STATUS.DONE)
+      .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+      .slice(0, 3);
+  }, [tasks]);
 
   const selected = tasks.find((task) => task.id === selectedTask?.id) || null;
 
@@ -50,7 +62,7 @@ const Calendar = () => {
         <div>
           <h1 className="text-3xl font-bold">Calendar</h1>
           <p className="mt-2 text-[var(--on-surface-variant)]">
-            Task deadlines from the same workspace data.
+            Task deadlines from workspace data.
           </p>
         </div>
         <button
@@ -134,24 +146,33 @@ const Calendar = () => {
                         {day}
                       </span>
                       {events.length > 0 ? (
-                        <span className="text-xs text-[var(--primary)]">{events.length}</span>
+                        <span className="text-xs font-medium text-[var(--primary)]">{events.length}</span>
                       ) : null}
                     </div>
                     <div className="mt-2 hidden space-y-1 sm:block">
-                      {events.slice(0, 2).map((event) => (
-                        <div
-                          key={event.id}
-                          className={`truncate rounded-md px-2 py-1 text-xs ${
-                            event.status === TASK_STATUS.DONE
-                              ? "bg-emerald-500/15 text-emerald-700"
-                              : isOverdue(event.dueDate, event.status)
-                                ? "bg-red-500/15 text-red-700"
-                                : "bg-[var(--primary)]/15 text-[var(--primary)]"
-                          }`}
-                        >
-                          {event.title}
-                        </div>
-                      ))}
+                      {events.slice(0, 2).map((event) => {
+                        const isDone = event.status === TASK_STATUS.DONE || event.status === "DONE";
+                        const overdue = isOverdue(event.dueDate, event.status);
+                        return (
+                          <div
+                            key={event.id}
+                            className={`truncate rounded-md px-2 py-1 text-xs ${
+                              isDone
+                                ? "bg-emerald-500/15 text-emerald-700"
+                                : overdue
+                                  ? "bg-red-500/15 text-red-700"
+                                  : "bg-[var(--primary)]/15 text-[var(--primary)]"
+                            }`}
+                          >
+                            {event.title}
+                          </div>
+                        );
+                      })}
+                      {events.length > 2 ? (
+                        <span className="text-[10px] text-[var(--outline)]">
+                          +{events.length - 2} more
+                        </span>
+                      ) : null}
                     </div>
                   </>
                 ) : null}
@@ -169,60 +190,45 @@ const Calendar = () => {
               type="button"
               key={event.id}
               onClick={() => setSelectedTask(event)}
-              className="rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container)] p-5 text-left"
+              className="rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container)] p-5 text-left transition hover:border-[var(--primary)]"
             >
               <CalendarDays className="text-[var(--primary)]" size={18} />
               <h3 className="mt-4 font-semibold">{event.title}</h3>
               <p className="mt-2 text-sm text-[var(--outline)]">{event.projectName}</p>
-              <p className="mt-4 text-xs text-[var(--primary)]">{event.dueDate}</p>
+              <p className="mt-4 text-xs font-medium text-[var(--primary)]">{event.dueDate}</p>
             </button>
           ))}
         </div>
       </section>
 
       {selectedDate ? (
-        <div
-          className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 p-5"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setSelectedDate(null);
-          }}
+        <Modal
+          title={`${monthName} ${selectedDate}, ${year}`}
+          description="Task deadlines scheduled for this day."
+          onClose={() => setSelectedDate(null)}
         >
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="w-full max-w-lg rounded-2xl border border-[var(--outline-variant)] bg-[var(--surface-container)] p-6"
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold">
-                {monthName} {selectedDate}, {year}
-              </h2>
-              <button type="button" onClick={() => setSelectedDate(null)} aria-label="Close">
-                ✕
-              </button>
+          {selectedEvents.length > 0 ? (
+            <div className="space-y-3">
+              {selectedEvents.map((event) => (
+                <button
+                  type="button"
+                  key={event.id}
+                  onClick={() => setSelectedTask(event)}
+                  className="w-full rounded-xl border border-[var(--outline-variant)] p-4 text-left transition hover:bg-[var(--surface-container-high)]"
+                >
+                  <h3 className="font-semibold">{event.title}</h3>
+                  <p className="mt-1 text-sm text-[var(--outline)]">{event.projectName}</p>
+                  <p className="mt-2 text-xs">
+                    {event.status} · {event.priority}
+                    {isOverdue(event.dueDate, event.status) ? " · Overdue" : ""}
+                  </p>
+                </button>
+              ))}
             </div>
-            {selectedEvents.length > 0 ? (
-              <div className="mt-6 space-y-3">
-                {selectedEvents.map((event) => (
-                  <button
-                    type="button"
-                    key={event.id}
-                    onClick={() => setSelectedTask(event)}
-                    className="w-full rounded-xl border border-[var(--outline-variant)] p-4 text-left"
-                  >
-                    <h3 className="font-semibold">{event.title}</h3>
-                    <p className="mt-1 text-sm text-[var(--outline)]">{event.projectName}</p>
-                    <p className="mt-2 text-xs">
-                      {event.status} · {event.priority}
-                      {event.overdue ? " · Overdue" : ""}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-6 text-sm text-[var(--outline)]">No deadlines on this day.</p>
-            )}
-          </div>
-        </div>
+          ) : (
+            <p className="text-sm text-[var(--outline)]">No deadlines on this day.</p>
+          )}
+        </Modal>
       ) : null}
 
       {selected ? (

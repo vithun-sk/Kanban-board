@@ -452,15 +452,11 @@ const LandingPage = () => {
               </li>
 
               <li>
-                <button className="cursor-pointer text-[var(--on-surface-variant)] transition-colors hover:text-[var(--on-surface)]">
-                  Privacy
-                </button>
+                <button type="button" onClick={() => navigate("/privacy")} className="cursor-pointer text-[var(--on-surface-variant)] transition-colors hover:text-[var(--on-surface)]">Privacy</button>
               </li>
 
               <li>
-                <button className="cursor-pointer text-[var(--on-surface-variant)] transition-colors hover:text-[var(--on-surface)]">
-                  Terms
-                </button>
+                <button type="button" onClick={() => navigate("/terms")} className="cursor-pointer text-[var(--on-surface-variant)] transition-colors hover:text-[var(--on-surface)]">Terms</button>
               </li>
             </ul>
           </div>
