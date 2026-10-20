@@ -34,6 +34,7 @@ public class ProjectService {
         this.taskRepository = taskRepository;
     }
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<ProjectDto> getAccessibleProjects(String userId) {
         List<Project> projects = projectRepository.findAccessibleProjects(userId);
         return projects.stream()
