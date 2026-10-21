@@ -1,6 +1,7 @@
 package com.flowsync.project;
 
 import com.flowsync.common.ApiResponse;
+import com.flowsync.message.ConversationDto;
 import com.flowsync.security.UserPrincipal;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -113,5 +114,24 @@ public class ProjectController {
     ) {
         projectService.removeProjectMember(projectId, memberId, principal.getId());
         return ResponseEntity.ok(ApiResponse.ok("Member removed.", null));
+    }
+
+    @GetMapping("/{projectId}/conversation")
+    public ResponseEntity<ApiResponse<ConversationDto>> getProjectConversation(
+            @PathVariable String projectId,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        ConversationDto conversation = projectService.getProjectConversation(projectId, principal.getId());
+        return ResponseEntity.ok(ApiResponse.ok(conversation));
+    }
+
+    @PostMapping("/{projectId}/conversation")
+    public ResponseEntity<ApiResponse<ConversationDto>> openProjectConversation(
+            @PathVariable String projectId,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        ConversationDto conversation = projectService.openProjectConversation(projectId, principal.getId());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok("Team conversation ready.", conversation));
     }
 }

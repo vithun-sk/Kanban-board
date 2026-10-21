@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import { LayoutGrid, List, Plus, UserPlus, X } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { LayoutGrid, List, MessageSquare, Plus, UserPlus, X } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import Breadcrumbs from "@/components/layouts/Breadcrumbs";
 import KanbanBoard from "@/components/kanban/KanbanBoard";
@@ -7,6 +7,7 @@ import TaskRow from "@/components/tasks/TaskRow";
 import TaskDetailsModal from "@/components/tasks/TaskDetailsModal";
 import CreateTaskModal from "@/components/tasks/CreateTaskModal";
 import ProjectForm from "@/components/projects/ProjectForm";
+import TeamChat from "@/components/messages/TeamChat";
 import Modal from "@/components/ui/Modal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import EmptyState from "@/components/ui/EmptyState";
@@ -23,12 +24,14 @@ const ProjectWorkspace = () => {
     projects,
     tasks,
     members,
+    conversations,
     updateProject,
     deleteProject,
     updateTask,
     deleteTask,
     addProjectMember,
     removeProjectMember,
+    openTeamConversation,
     submitting,
   } = useApp();
   const { push } = useToast();
@@ -44,6 +47,38 @@ const ProjectWorkspace = () => {
   const [selectedMemberId, setSelectedMemberId] = useState("");
   const [memberRole, setMemberRole] = useState("Member");
   const [removingMember, setRemovingMember] = useState(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatConversationId, setChatConversationId] = useState(null);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatError, setChatError] = useState(null);
+
+  const projectConversation = useMemo(() => {
+    const fromApi = conversations.find((conversation) => conversation.projectId === project?.id);
+    return fromApi || null;
+  }, [conversations, project?.id]);
+
+  useEffect(() => {
+    if (!project) return;
+    if (chatConversationId) return;
+    if (projectConversation) {
+      setChatConversationId(projectConversation.id);
+    }
+  }, [project, projectConversation, chatConversationId]);
+
+  const handleOpenChat = async () => {
+    setChatError(null);
+    setChatLoading(true);
+    try {
+      const conversation = await openTeamConversation(project.id);
+      setChatConversationId(conversation?.id || null);
+      setChatOpen(true);
+    } catch (err) {
+      setChatError(err.message || "Failed to open the team conversation.");
+      push(err.message || "Failed to open the team conversation.", "error");
+    } finally {
+      setChatLoading(false);
+    }
+  };
 
   const projectTasks = useMemo(() => {
     return tasks.filter((task) => {
@@ -184,6 +219,38 @@ const ProjectWorkspace = () => {
             </span>
           ))}
         </div>
+      </section>
+
+      <section className="mt-6">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Team chat</h2>
+          <button
+            type="button"
+            onClick={handleOpenChat}
+            disabled={chatLoading}
+            className="flex items-center gap-1.5 text-xs font-medium text-[var(--primary)] hover:underline disabled:opacity-60"
+          >
+            <MessageSquare size={14} />
+            {chatOpen ? "Refresh chat" : "Open team chat"}
+          </button>
+        </div>
+        {chatError ? (
+          <p className="mb-2 rounded-lg bg-[var(--error-container)] px-3 py-2 text-sm text-[var(--on-error-container)]">
+            {chatError}
+          </p>
+        ) : null}
+        {chatOpen && chatConversationId ? (
+          <TeamChat
+            conversationId={chatConversationId}
+            title={`${project.name} team chat`}
+            description="Messages are stored on the server and stay available after a refresh."
+            emptyDescription="No messages yet. Start the conversation with your team."
+          />
+        ) : (
+          <p className="rounded-xl border border-[var(--outline-variant)] px-4 py-6 text-sm text-[var(--outline)]">
+            Open the team chat to talk with the project members.
+          </p>
+        )}
       </section>
 
       <section className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">

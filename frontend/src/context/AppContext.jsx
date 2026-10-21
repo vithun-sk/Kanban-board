@@ -22,6 +22,7 @@ import {
   addProjectMemberApi,
   createProjectApi,
   listProjects,
+  openProjectConversation,
   removeProject,
   removeProjectMemberApi,
   updateProjectApi,
@@ -34,8 +35,11 @@ import {
   updateTaskApi,
 } from "@/services/tasksService";
 import {
+  findUserByEmail,
   listMembers,
+  removeUserMembershipsApi,
   updateProfileApi,
+  updateUserRoleApi,
 } from "@/services/membersService";
 import {
   dismissNotificationApi,
@@ -46,9 +50,11 @@ import {
 import {
   createConversationApi,
   listConversations,
+  listMessagePage,
   listMessages,
   postMessage,
 } from "@/services/messagesService";
+import { realtimeClient } from "@/services/realtime";
 import {
   dashboardMetrics,
   decorateProject,
@@ -73,6 +79,29 @@ function pushActivity(list, message) {
   ].slice(0, 40);
 }
 
+/**
+ * Merges messages by id and keeps them in chronological order. Messages can arrive both
+ * from the API response and from the real-time broadcast, so duplicates are removed here.
+ */
+function mergeMessages(existing, incoming) {
+  const byId = new Map((existing || []).map((message) => [message.id, message]));
+  (incoming || []).forEach((message) => {
+    if (message && message.id) byId.set(message.id, message);
+  });
+  return [...byId.values()].sort(
+    (left, right) => new Date(left.createdAt || 0) - new Date(right.createdAt || 0)
+  );
+}
+
+function mergeConversation(existing, incoming) {
+  if (!incoming) return existing;
+  const index = (existing || []).findIndex((conversation) => conversation.id === incoming.id);
+  if (index === -1) return [incoming, ...(existing || [])];
+  const next = [...existing];
+  next[index] = { ...next[index], ...incoming };
+  return next;
+}
+
 export function AppProvider({ children }) {
   const demo = isDemoMode();
   const [workspace, setWorkspace] = useState(getDemoState);
@@ -89,6 +118,8 @@ export function AppProvider({ children }) {
   const [apiNotifications, setApiNotifications] = useState([]);
   const [apiConversations, setApiConversations] = useState([]);
   const [apiMessages, setApiMessages] = useState([]);
+  const [apiMessagePages, setApiMessagePages] = useState({});
+  const [apiMessageStatus, setApiMessageStatus] = useState({});
   const [apiActivity, setApiActivity] = useState([]);
   const [apiSettings, setApiSettings] = useState(() => ({
     notifyTaskAssigned: true,
@@ -119,25 +150,26 @@ export function AppProvider({ children }) {
     setLoading(true);
     setApiError(null);
     try {
-      const [projectsData, tasksData, membersData, notificationsData, conversationsData] =
-        await Promise.all([
-          listProjects().catch(() => []),
-          listTasks().catch(() => []),
-          listMembers().catch(() => []),
-          listNotifications().catch(() => []),
-          listConversations().catch(() => []),
-        ]);
+      // Every request is reported, a failing endpoint is never replaced by an empty list.
+      const results = await Promise.allSettled([
+        listProjects(),
+        listTasks(),
+        listMembers(),
+        listNotifications(),
+        listConversations(),
+      ]);
 
-      setApiProjects(projectsData || []);
-      setApiTasks(tasksData || []);
-      setApiMembers(membersData || []);
-      setApiNotifications(notificationsData || []);
-      setApiConversations(conversationsData || []);
+      const [projectsResult, tasksResult, membersResult, notificationsResult, conversationsResult] = results;
+      const failure = results.find((result) => result.status === "rejected");
 
-      if (conversationsData && conversationsData.length > 0) {
-        const firstConvId = conversationsData[0].id;
-        const messagesData = await listMessages(firstConvId).catch(() => []);
-        setApiMessages(messagesData || []);
+      if (projectsResult.status === "fulfilled") setApiProjects(projectsResult.value || []);
+      if (tasksResult.status === "fulfilled") setApiTasks(tasksResult.value || []);
+      if (membersResult.status === "fulfilled") setApiMembers(membersResult.value || []);
+      if (notificationsResult.status === "fulfilled") setApiNotifications(notificationsResult.value || []);
+      if (conversationsResult.status === "fulfilled") setApiConversations(conversationsResult.value || []);
+
+      if (failure) {
+        setApiError(failure.reason?.message || "Failed to load workspace data from API.");
       }
     } catch (err) {
       setApiError(err.message || "Failed to load workspace data from API.");
@@ -151,6 +183,16 @@ export function AppProvider({ children }) {
       loadApiData();
     }
   }, [demo, session?.token, loadApiData]);
+
+  // Keep the real-time connection aligned with the signed in session.
+  useEffect(() => {
+    if (demo || !session?.token) {
+      realtimeClient.disconnect();
+      return undefined;
+    }
+    realtimeClient.connect(session.token);
+    return undefined;
+  }, [demo, session?.token]);
 
   const currentUser = session?.user || defaultUser;
 
@@ -404,20 +446,35 @@ export function AppProvider({ children }) {
 
   // Members Actions
   const addMember = useCallback(
-    (payload) => {
+    async (payload) => {
+      const email = String(payload.email || "").trim();
+
+      if (!demo) {
+        // Only accounts that already exist in the users table can be added. The backend
+        // rejects unknown addresses, so no account is ever created from the UI.
+        const account = await findUserByEmail(email);
+        const member = {
+          id: account.id,
+          name: account.name,
+          email: account.email,
+          initials: account.initials,
+          role: payload.role || account.role || "Member",
+          title: account.title || "Team member",
+        };
+        setApiMembers((prev) =>
+          prev.some((existing) => existing.id === member.id) ? prev : [...prev, member]
+        );
+        return member;
+      }
+
       const member = {
         id: createId("m"),
         name: payload.name.trim(),
-        email: payload.email.trim(),
+        email,
         initials: getInitials(payload.name),
         role: payload.role || "Member",
         title: payload.title || "Team member",
       };
-
-      if (!demo) {
-        setApiMembers((prev) => [...prev, member]);
-        return member;
-      }
 
       updateDemoState((state) => ({
         ...state,
@@ -442,8 +499,15 @@ export function AppProvider({ children }) {
   );
 
   const updateMember = useCallback(
-    (id, payload) => {
+    async (id, payload) => {
       if (!demo) {
+        if (payload.role) {
+          const updated = await updateUserRoleApi(id, payload.role);
+          setApiMembers((prev) =>
+            prev.map((member) => (member.id === id ? { ...member, ...updated } : member))
+          );
+          return;
+        }
         setApiMembers((prev) =>
           prev.map((member) => (member.id === id ? { ...member, ...payload } : member))
         );
@@ -461,9 +525,25 @@ export function AppProvider({ children }) {
   );
 
   const removeMember = useCallback(
-    (id) => {
+    async (id) => {
       if (!demo) {
+        // The memberships are removed by the API. The account itself stays untouched.
+        await removeUserMembershipsApi(id);
         setApiMembers((prev) => prev.filter((member) => member.id !== id));
+        setApiProjects((prev) =>
+          prev.map((project) => {
+            const memberList = (project.memberList || []).filter((member) => member.userId !== id);
+            const removed = (project.memberList || []).find((member) => member.userId === id);
+            return {
+              ...project,
+              memberList,
+              memberIds: removed
+                ? (project.memberIds || []).filter((memberId) => memberId !== id)
+                : project.memberIds,
+              members: memberList.length,
+            };
+          })
+        );
         setApiTasks((prev) =>
           prev.map((task) => (task.assigneeId === id ? { ...task, assigneeId: null } : task))
         );
@@ -489,8 +569,23 @@ export function AppProvider({ children }) {
     async (projectId, payload) => {
       if (!demo) {
         const added = await addProjectMemberApi(projectId, payload);
-        const freshProjects = await listProjects();
-        setApiProjects(freshProjects);
+        // The state is only updated after the API confirmed the membership.
+        setApiProjects((prev) =>
+          prev.map((project) =>
+            project.id === projectId
+              ? {
+                  ...project,
+                  memberList: project.memberList?.some((member) => member.id === added.id)
+                    ? project.memberList
+                    : [...(project.memberList || []), added],
+                  memberIds: project.memberIds?.includes(added.userId)
+                    ? project.memberIds
+                    : [...(project.memberIds || []), added.userId],
+                  members: (project.members || 0) + 1,
+                }
+              : project
+          )
+        );
         setApiActivity((prev) =>
           pushActivity(prev, `${currentUser.name} added ${added.name || "a member"} to a project.`)
         );
@@ -516,9 +611,25 @@ export function AppProvider({ children }) {
   const removeProjectMember = useCallback(
     async (projectId, memberId) => {
       if (!demo) {
+        // The membership row is deleted by the API first. The local state is only
+        // updated once the request succeeded, so a failed request keeps the member.
         await removeProjectMemberApi(projectId, memberId);
-        const freshProjects = await listProjects();
-        setApiProjects(freshProjects);
+        setApiProjects((prev) =>
+          prev.map((project) => {
+            if (project.id !== projectId) return project;
+            const removed = (project.memberList || []).find((member) => member.id === memberId);
+            const memberList = (project.memberList || []).filter((member) => member.id !== memberId);
+            const memberIds = removed
+              ? (project.memberIds || []).filter((id) => id !== removed.userId)
+              : project.memberIds;
+            return {
+              ...project,
+              memberList,
+              memberIds,
+              members: Math.max((project.members || memberList.length) - 1, 0),
+            };
+          })
+        );
         setApiActivity((prev) =>
           pushActivity(prev, `${currentUser.name} removed a member from a project.`)
         );
@@ -589,11 +700,88 @@ export function AppProvider({ children }) {
   );
 
   // Messages Actions
+  const loadMessages = useCallback(
+    async (conversationId, page = 0) => {
+      if (!demo) {
+        setApiMessageStatus((prev) => ({
+          ...prev,
+          [conversationId]: { ...(prev[conversationId] || {}), loading: true, error: null },
+        }));
+        try {
+          const result = await listMessagePage(conversationId, page);
+          const items = result?.items || [];
+          setApiMessages((prev) => mergeMessages(prev, items));
+          setApiMessagePages((prev) => ({
+            ...prev,
+            [conversationId]: {
+              page: result?.page ?? page,
+              size: result?.size ?? items.length,
+              totalElements: result?.totalElements ?? items.length,
+              totalPages: result?.totalPages ?? 1,
+              hasNewer: result?.hasNewer ?? false,
+              hasOlder: result?.hasOlder ?? false,
+            },
+          }));
+          setApiMessageStatus((prev) => ({
+            ...prev,
+            [conversationId]: { ...(prev[conversationId] || {}), loading: false, error: null },
+          }));
+          return result;
+        } catch (err) {
+          setApiMessageStatus((prev) => ({
+            ...prev,
+            [conversationId]: {
+              ...(prev[conversationId] || {}),
+              loading: false,
+              error: err.message || "Failed to load messages.",
+            },
+          }));
+          throw err;
+        }
+      }
+
+      const messages = await listMessages(conversationId);
+      setApiMessages((prev) => mergeMessages(prev, messages));
+      return { items: messages, page: 0, totalElements: messages.length, hasOlder: false };
+    },
+    [demo]
+  );
+
+  const openTeamConversation = useCallback(
+    async (projectId) => {
+      if (demo) {
+        const project = workspace.projects.find((item) => item.id === projectId);
+        const existing = workspace.conversations.find(
+          (conversation) => conversation.projectId === projectId
+        );
+        if (existing) return existing;
+        const conversation = {
+          id: createId("c"),
+          title: `${project?.name || "Project"} team chat`,
+          memberIds: project?.memberIds || [CURRENT_USER_ID],
+          projectId,
+          updatedAt: new Date().toISOString(),
+        };
+        updateDemoState((state) => ({
+          ...state,
+          conversations: [conversation, ...state.conversations],
+        }));
+        return conversation;
+      }
+
+      const conversation = await openProjectConversation(projectId);
+      setApiConversations((prev) => mergeConversation(prev, conversation));
+      await loadMessages(conversation.id);
+      return conversation;
+    },
+    [demo, loadMessages, workspace]
+  );
+
   const sendMessage = useCallback(
     async (conversationId, body) => {
       if (!demo) {
         const sent = await postMessage(conversationId, body.trim());
-        setApiMessages((prev) => [...prev, sent]);
+        setApiMessages((prev) => mergeMessages(prev, [sent]));
         setApiConversations((prev) =>
           prev.map((c) => (c.id === conversationId ? { ...c, updatedAt: sent.createdAt } : c))
         );
@@ -620,6 +808,21 @@ export function AppProvider({ children }) {
     },
     [demo, currentUser.id]
   );
+
+  const subscribeToConversation = useCallback((conversationId, handler) => {
+    if (!conversationId) return () => {};
+    return realtimeClient.subscribe(conversationId, (message) => {
+      setApiMessages((prev) => mergeMessages(prev, [message]));
+      setApiConversations((prev) =>
+        prev.map((conversation) =>
+          conversation.id === conversationId
+            ? { ...conversation, updatedAt: message.createdAt || conversation.updatedAt }
+            : conversation
+        )
+      );
+      handler?.(message);
+    });
+  }, []);
 
   const createConversation = useCallback(
     async (memberId) => {
@@ -776,6 +979,8 @@ export function AppProvider({ children }) {
       notifications: currentWorkspace.notifications,
       conversations: currentWorkspace.conversations,
       messages: currentWorkspace.messages,
+      messageStatus: apiMessageStatus,
+      messagePages: apiMessagePages,
       activity: currentWorkspace.activity,
       settings: currentWorkspace.settings,
       currentUser,
@@ -805,6 +1010,9 @@ export function AppProvider({ children }) {
       dismissNotification,
       sendMessage,
       createConversation,
+      loadMessages,
+      openTeamConversation,
+      subscribeToConversation,
       updateSettings,
       updateProfile,
       resetWorkspace,
@@ -823,6 +1031,8 @@ export function AppProvider({ children }) {
       demo,
       metrics,
       unreadCount,
+      apiMessageStatus,
+      apiMessagePages,
       refreshSession,
       setTheme,
       createProject,
@@ -841,6 +1051,9 @@ export function AppProvider({ children }) {
       dismissNotification,
       sendMessage,
       createConversation,
+      loadMessages,
+      openTeamConversation,
+      subscribeToConversation,
       updateSettings,
       updateProfile,
       resetWorkspace,

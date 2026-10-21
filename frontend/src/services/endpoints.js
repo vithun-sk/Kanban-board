@@ -6,10 +6,14 @@ export const endpoints = {
   profile: "/users/me",
   changePassword: "/users/me/change-password",
   users: "/users",
+  userByEmail: (email) => `/users/by-email?email=${encodeURIComponent(email)}`,
+  userMemberships: (id) => `/users/${id}/memberships`,
+  userRole: (id) => `/users/${id}/role`,
   projects: "/projects",
   project: (id) => `/projects/${id}`,
   projectMembers: (id) => `/projects/${id}/members`,
   projectMember: (projectId, memberId) => `/projects/${projectId}/members/${memberId}`,
+  projectConversation: (id) => `/projects/${id}/conversation`,
   tasks: "/tasks",
   projectTasks: (projectId) => `/projects/${projectId}/tasks`,
   task: (id) => `/tasks/${id}`,
@@ -21,4 +25,6 @@ export const endpoints = {
   notificationsReadAll: "/notifications/read-all",
   conversations: "/conversations",
   messages: (conversationId) => `/conversations/${conversationId}/messages`,
+  messagePage: (conversationId, page = 0, size = 50) =>
+    `/conversations/${conversationId}/messages/page?page=${page}&size=${size}`,
 };

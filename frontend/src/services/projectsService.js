@@ -69,3 +69,17 @@ export async function removeProjectMemberApi(projectId, memberId) {
     method: "DELETE",
   });
 }
+
+/**
+ * Shared team channel of a project. The backend creates it on demand and keeps its
+ * participant list in sync with the project members.
+ */
+export async function getProjectConversation(projectId) {
+  if (isDemoMode()) return null;
+  return apiRequest(endpoints.projectConversation(projectId));
+}
+
+export async function openProjectConversation(projectId) {
+  if (isDemoMode()) return null;
+  return apiRequest(endpoints.projectConversation(projectId), { method: "POST" });
+}

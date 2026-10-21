@@ -1,17 +1,20 @@
 package com.flowsync.project;
 
-import jakarta.validation.constraints.NotBlank;
-
 public class AddMemberRequest {
 
     private String userId;
 
     private String email;
 
-    @NotBlank(message = "Role is required.")
     private String role = "Member";
 
     public AddMemberRequest() {
+    }
+
+    public AddMemberRequest(String userId, String email, String role) {
+        this.userId = userId;
+        this.email = email;
+        this.role = role;
     }
 
     public String getUserId() {

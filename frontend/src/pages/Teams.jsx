@@ -37,10 +37,10 @@ const Teams = () => {
 
   const taskCount = (id) => tasks.filter((task) => task.assigneeId === id).length;
 
-  const submitInvite = (event) => {
+  const submitInvite = async (event) => {
     event.preventDefault();
     const next = {};
-    if (!name.trim()) next.name = "Name is required.";
+    if (!isDemoMode && !name.trim()) next.name = "Name is required.";
     if (!email.trim()) next.email = "Email is required.";
     else if (!isValidEmail(email)) next.email = "Enter a valid email.";
     else if (members.some((member) => member.email.toLowerCase() === email.trim().toLowerCase())) {
@@ -48,12 +48,22 @@ const Teams = () => {
     }
     setErrors(next);
     if (Object.keys(next).length) return;
-    addMember({ name, email, role: inviteRole });
-    push(isDemoMode ? "Member added to demo workspace." : "Member added.");
-    setInviteOpen(false);
-    setName("");
-    setEmail("");
-    setInviteRole("Member");
+
+    try {
+      const member = await addMember({ name, email, role: inviteRole });
+      push(
+        isDemoMode
+          ? "Member added to demo workspace."
+          : `${member.name} is a registered FlowSync account and is listed in the workspace directory.`
+      );
+      setInviteOpen(false);
+      setName("");
+      setEmail("");
+      setInviteRole("Member");
+    } catch (err) {
+      // The backend rejects addresses that do not belong to a registered account.
+      setErrors({ email: err.message || "No registered FlowSync account found for that email." });
+    }
   };
 
   return (
@@ -145,15 +155,17 @@ const Teams = () => {
           description={
             isDemoMode
               ? "This adds a local demo profile. No email is sent."
-              : "Add a new member to the workspace directory."
+              : "Only registered FlowSync accounts can be added. The person has to sign up first, no account is created here."
           }
           onClose={() => setInviteOpen(false)}
           closeOnBackdrop={false}
         >
           <form onSubmit={submitInvite} className="space-y-4">
-            <Field label="Full name" htmlFor="invite-name" error={errors.name}>
-              <input id="invite-name" value={name} onChange={(event) => setName(event.target.value)} className={inputClass} />
-            </Field>
+            {isDemoMode ? (
+              <Field label="Full name" htmlFor="invite-name" error={errors.name}>
+                <input id="invite-name" value={name} onChange={(event) => setName(event.target.value)} className={inputClass} />
+              </Field>
+            ) : null}
             <Field label="Email" htmlFor="invite-email" error={errors.email}>
               <input id="invite-email" value={email} onChange={(event) => setEmail(event.target.value)} className={inputClass} />
             </Field>
@@ -201,10 +213,14 @@ const Teams = () => {
             </button>
             <button
               type="button"
-              onClick={() => {
-                updateMember(editing.id, { role: editing.role });
-                push(isDemoMode ? "Role updated in demo workspace." : "Member role updated.");
-                setEditing(null);
+              onClick={async () => {
+                try {
+                  await updateMember(editing.id, { role: editing.role });
+                  push(isDemoMode ? "Role updated in demo workspace." : "Member role updated.");
+                  setEditing(null);
+                } catch (err) {
+                  push(err.message || "Failed to update the member role.", "error");
+                }
               }}
               className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm text-white"
             >
@@ -221,10 +237,14 @@ const Teams = () => {
           <button
             type="button"
             className="mt-5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm text-white"
-            onClick={() => {
-              createConversation(detail.id);
-              setDetail(null);
-              navigate("/messages");
+            onClick={async () => {
+              try {
+                await createConversation(detail.id);
+                setDetail(null);
+                navigate("/messages");
+              } catch (err) {
+                push(err.message || "Failed to open the conversation.", "error");
+              }
             }}
           >
             {isDemoMode ? "Open demo conversation" : "Send message"}
@@ -235,14 +255,26 @@ const Teams = () => {
       {removing ? (
         <ConfirmDialog
           title={`Remove ${removing.name}?`}
-          description="They will be removed from this workspace and unassigned from tasks."
+          description={
+            isDemoMode
+              ? "They will be removed from this workspace and unassigned from tasks."
+              : "They will be removed from every project and unassigned from tasks. The FlowSync account itself stays untouched."
+          }
           confirmLabel="Remove member"
           destructive
           onClose={() => setRemoving(null)}
-          onConfirm={() => {
-            removeMember(removing.id);
-            push("Member removed.");
-            setRemoving(null);
+          onConfirm={async () => {
+            try {
+              await removeMember(removing.id);
+              push(
+                isDemoMode
+                  ? "Member removed."
+                  : "Member removed from all projects. The account itself is unchanged."
+              );
+              setRemoving(null);
+            } catch (err) {
+              push(err.message || "Failed to remove the member.", "error");
+            }
           }}
         />
       ) : null}

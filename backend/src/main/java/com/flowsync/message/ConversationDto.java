@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 public class ConversationDto {
     private String id;
     private String title;
+    private String projectId;
     private List<String> memberIds = new ArrayList<>();
     private Instant createdAt;
     private Instant updatedAt;
@@ -20,6 +21,7 @@ public class ConversationDto {
         ConversationDto dto = new ConversationDto();
         dto.setId(c.getId());
         dto.setTitle(c.getTitle());
+        dto.setProjectId(c.getProjectId());
         if (c.getMembers() != null) {
             dto.setMemberIds(c.getMembers().stream()
                     .map(m -> m.getUser().getId())
@@ -36,6 +38,14 @@ public class ConversationDto {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getProjectId() {
+        return projectId;
+    }
+
+    public void setProjectId(String projectId) {
+        this.projectId = projectId;
     }
 
     public String getTitle() {

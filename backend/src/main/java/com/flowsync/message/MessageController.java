@@ -45,6 +45,17 @@ public class MessageController {
         return ResponseEntity.ok(ApiResponse.ok(messages));
     }
 
+    @GetMapping("/{conversationId}/messages/page")
+    public ResponseEntity<ApiResponse<MessagePageDto>> getMessagePage(
+            @PathVariable String conversationId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        MessagePageDto messages = messageService.getConversationMessagesPage(conversationId, principal.getId(), page, size);
+        return ResponseEntity.ok(ApiResponse.ok(messages));
+    }
+
     @PostMapping("/{conversationId}/messages")
     public ResponseEntity<ApiResponse<MessageDto>> sendMessage(
             @PathVariable String conversationId,

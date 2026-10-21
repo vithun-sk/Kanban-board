@@ -47,12 +47,18 @@ public class JwtService {
     }
 
     public String getUserIdFromToken(String token) {
-        Claims claims = Jwts.parser()
+        return parseClaims(token).getSubject();
+    }
+
+    /**
+     * Parses and verifies a token, returning its claims. Throws when the token is invalid.
+     */
+    public Claims parseClaims(String token) {
+        return Jwts.parser()
                 .verifyWith(secretKey)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
-        return claims.getSubject();
     }
 
     public boolean validateToken(String token) {

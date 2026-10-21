@@ -3,6 +3,8 @@ package com.flowsync.project;
 import com.flowsync.exception.BadRequestException;
 import com.flowsync.exception.ForbiddenException;
 import com.flowsync.exception.ResourceNotFoundException;
+import com.flowsync.message.ConversationDto;
+import com.flowsync.message.ProjectConversationService;
 import com.flowsync.task.TaskRepository;
 import com.flowsync.task.TaskStatus;
 import com.flowsync.user.User;
@@ -11,30 +13,42 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
 public class ProjectService {
 
+    private static final Pattern EMAIL_PATTERN =
+            Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+
+    private static final Set<String> ALLOWED_MEMBER_ROLES =
+            Set.of("Owner", "Admin", "Developer", "Designer", "QA", "Member");
+
     private final ProjectRepository projectRepository;
     private final ProjectMemberRepository memberRepository;
     private final UserRepository userRepository;
     private final TaskRepository taskRepository;
+    private final ProjectConversationService projectConversationService;
 
     public ProjectService(
             ProjectRepository projectRepository,
             ProjectMemberRepository memberRepository,
             UserRepository userRepository,
-            TaskRepository taskRepository
+            TaskRepository taskRepository,
+            ProjectConversationService projectConversationService
     ) {
         this.projectRepository = projectRepository;
         this.memberRepository = memberRepository;
         this.userRepository = userRepository;
         this.taskRepository = taskRepository;
+        this.projectConversationService = projectConversationService;
     }
 
-    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    @Transactional(readOnly = true)
     public List<ProjectDto> getAccessibleProjects(String userId) {
         List<Project> projects = projectRepository.findAccessibleProjects(userId);
         return projects.stream()
@@ -42,6 +56,7 @@ public class ProjectService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public ProjectDto getProjectById(String projectId, String userId) {
         Project project = projectRepository.findByIdWithMembers(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found."));
@@ -133,6 +148,7 @@ public class ProjectService {
         projectRepository.delete(project);
     }
 
+    @Transactional(readOnly = true)
     public List<ProjectMemberDto> getProjectMembers(String projectId, String userId) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found."));
@@ -150,29 +166,64 @@ public class ProjectService {
 
         validateProjectModification(project, userId);
 
-        User targetUser;
-        if (request.getUserId() != null && !request.getUserId().isBlank()) {
-            targetUser = userRepository.findById(request.getUserId())
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + request.getUserId()));
-        } else if (request.getEmail() != null && !request.getEmail().isBlank()) {
-            targetUser = userRepository.findByEmailIgnoreCase(request.getEmail().trim())
-                    .orElseThrow(() -> new ResourceNotFoundException("No registered user found with email: " + request.getEmail()));
-        } else {
-            throw new BadRequestException("Either userId or email is required to add a member.");
+        User targetUser = resolveRegisteredUser(request);
+
+        if (targetUser.getId().equals(project.getCreatedBy().getId())) {
+            throw new BadRequestException("The project owner is already a member of this project.");
         }
 
         if (memberRepository.existsByProjectIdAndUserId(projectId, targetUser.getId())) {
-            throw new BadRequestException("User is already a member of this project.");
+            throw new BadRequestException(targetUser.getName() + " is already a member of this project.");
         }
 
         ProjectMember member = new ProjectMember(
                 UUID.randomUUID().toString(),
                 project,
                 targetUser,
-                request.getRole() != null ? request.getRole() : "Member"
+                normalizeRole(request.getRole(), project, userId)
         );
         ProjectMember saved = memberRepository.save(member);
+        projectConversationService.addParticipant(projectId, targetUser.getId());
         return ProjectMemberDto.fromEntity(saved);
+    }
+
+    /**
+     * Resolves the target member from an existing FlowSync account only.
+     * Unknown emails or user ids are rejected instead of creating an account.
+     */
+    private User resolveRegisteredUser(AddMemberRequest request) {
+        String requestedUserId = request.getUserId() != null ? request.getUserId().trim() : "";
+        String requestedEmail = request.getEmail() != null ? request.getEmail().trim() : "";
+
+        if (requestedUserId.isEmpty() && requestedEmail.isEmpty()) {
+            throw new BadRequestException("Provide the email address or user id of a registered FlowSync account.");
+        }
+
+        if (!requestedEmail.isEmpty()) {
+            if (!EMAIL_PATTERN.matcher(requestedEmail).matches()) {
+                throw new BadRequestException("Enter a valid email address.");
+            }
+            String normalizedEmail = requestedEmail.toLowerCase(Locale.ROOT);
+            return userRepository.findByEmailIgnoreCase(normalizedEmail)
+                    .orElseThrow(() -> new BadRequestException(
+                            "No registered FlowSync account found for '" + normalizedEmail
+                                    + "'. The person must create an account before joining a project."));
+        }
+
+        return userRepository.findById(requestedUserId)
+                .orElseThrow(() -> new BadRequestException(
+                        "No registered FlowSync account found for user id '" + requestedUserId + "'."));
+    }
+
+    private String normalizeRole(String requestedRole, Project project, String actingUserId) {
+        String role = requestedRole != null && !requestedRole.isBlank() ? requestedRole.trim() : "Member";
+        if (!ALLOWED_MEMBER_ROLES.contains(role)) {
+            throw new BadRequestException("Role must be one of: " + String.join(", ", ALLOWED_MEMBER_ROLES) + ".");
+        }
+        if ("Owner".equals(role) && !project.getCreatedBy().getId().equals(actingUserId)) {
+            throw new ForbiddenException("Only the project owner can assign the Owner role.");
+        }
+        return role;
     }
 
     @Transactional
@@ -208,11 +259,32 @@ public class ProjectService {
             throw new BadRequestException("Membership does not belong to this project.");
         }
 
-        if (pm.getUser().getId().equals(project.getCreatedBy().getId())) {
+        String removedUserId = pm.getUser().getId();
+
+        if (removedUserId.equals(project.getCreatedBy().getId())) {
             throw new BadRequestException("Cannot remove project creator.");
         }
 
+        // Only the project membership row is deleted. The user account and every other
+        // project membership of that user stay untouched.
         memberRepository.delete(pm);
+        projectConversationService.removeParticipant(projectId, removedUserId);
+    }
+
+    @Transactional(readOnly = true)
+    public ConversationDto getProjectConversation(String projectId, String userId) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found."));
+        validateProjectAccess(project, userId);
+        return projectConversationService.getOrCreateProjectConversation(projectId, userId);
+    }
+
+    @Transactional
+    public ConversationDto openProjectConversation(String projectId, String userId) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found."));
+        validateProjectAccess(project, userId);
+        return projectConversationService.getOrCreateProjectConversation(projectId, userId);
     }
 
     public void validateProjectAccess(Project project, String userId) {

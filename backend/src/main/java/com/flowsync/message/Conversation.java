@@ -16,6 +16,9 @@ public class Conversation {
     @Column(nullable = false, length = 150)
     private String title;
 
+    @Column(name = "project_id", length = 36)
+    private String projectId;
+
     @OneToMany(mappedBy = "conversation", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ConversationMember> members = new ArrayList<>();
 
@@ -29,8 +32,13 @@ public class Conversation {
     }
 
     public Conversation(String id, String title) {
+        this(id, title, null);
+    }
+
+    public Conversation(String id, String title, String projectId) {
         this.id = id;
         this.title = title;
+        this.projectId = projectId;
         this.createdAt = Instant.now();
         this.updatedAt = Instant.now();
     }
@@ -60,6 +68,14 @@ public class Conversation {
 
     public void setTitle(String title) {
         this.title = title;
+    }
+
+    public String getProjectId() {
+        return projectId;
+    }
+
+    public void setProjectId(String projectId) {
+        this.projectId = projectId;
     }
 
     public List<ConversationMember> getMembers() {

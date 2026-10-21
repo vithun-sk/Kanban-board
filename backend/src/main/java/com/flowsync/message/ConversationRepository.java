@@ -11,9 +11,11 @@ import java.util.Optional;
 @Repository
 public interface ConversationRepository extends JpaRepository<Conversation, String> {
 
-    @Query("SELECT DISTINCT c FROM Conversation c JOIN c.members m WHERE m.user.id = :userId ORDER BY c.updatedAt DESC")
+    @Query("SELECT DISTINCT c FROM Conversation c LEFT JOIN FETCH c.members m LEFT JOIN FETCH m.user WHERE m.user.id = :userId ORDER BY c.updatedAt DESC")
     List<Conversation> findUserConversations(@Param("userId") String userId);
 
     @Query("SELECT c FROM Conversation c LEFT JOIN FETCH c.members m LEFT JOIN FETCH m.user WHERE c.id = :id")
     Optional<Conversation> findByIdWithMembers(@Param("id") String id);
+
+    Optional<Conversation> findByProjectId(String projectId);
 }

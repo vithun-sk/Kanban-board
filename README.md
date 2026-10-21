@@ -45,9 +45,9 @@ Collaborative-Kanban-Board/
 │   │   │   ├── java/com/flowsync/
 │   │   │   │   ├── auth/            # AuthController, AuthService, JWT response DTOs
 │   │   │   │   ├── common/          # ApiResponse<T>, ErrorResponse wrappers
-│   │   │   │   ├── config/          # DevDataSeeder, CORS, web configs
+│   │   │   │   ├── config/          # DevDataSeeder, CORS, WebSocket (STOMP) configuration
 │   │   │   │   ├── exception/       # GlobalExceptionHandler, custom exceptions
-│   │   │   │   ├── message/         # Conversation and Message entities, controller, service
+│   │   │   │   ├── message/         # Conversation and Message entities, controller, service, project team channel
 │   │   │   │   ├── notification/    # Notification entity, controller, service
 │   │   │   │   ├── project/         # Project & ProjectMember entities, controller, service
 │   │   │   │   ├── security/        # SecurityConfig, JwtService, JwtAuthenticationFilter
@@ -55,7 +55,7 @@ Collaborative-Kanban-Board/
 │   │   │   │   ├── user/            # User entity, UserController, UserService
 │   │   │   │   └── FlowSyncApplication.java
 │   │   │   └── resources/
-│   │   │       ├── db/migration/    # V1__init_schema.sql (Flyway relational schema)
+│   │   │       ├── db/migration/    # V1__init_schema.sql, V2__link_project_conversations.sql (Flyway relational schema)
 │   │   │       └── application.properties
 │   │   └── test/
 │   │       ├── java/com/flowsync/   # Integration & unit test suite (Auth, Tasks, Projects, JWT)
@@ -73,7 +73,7 @@ Collaborative-Kanban-Board/
 │   │   ├── data/                    # Initial seed data for offline demo mode
 │   │   ├── lib/                     # Utilities (dates, storage, validation, IDs)
 │   │   ├── pages/                   # Route pages (Home, Projects, Tasks, Calendar, Teams, etc.)
-│   │   └── services/                # REST API clients, endpoints, selectors, demo repository
+│   │   └── services/                # REST API clients, endpoints, selectors, demo repository, STOMP realtime client
 │   ├── index.html
 │   ├── package.json
 │   ├── vite.config.js
@@ -190,9 +190,12 @@ All backend responses are wrapped in a standard JSON envelope:
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
 | `GET` | `/api/v1/users` | Bearer Token | List all registered workspace users |
+| `GET` | `/api/v1/users/by-email?email=` | Bearer Token | Look up a registered account by email (404 when unknown) |
 | `GET` | `/api/v1/users/me` | Bearer Token | Get active user profile |
 | `PATCH` | `/api/v1/users/me` | Bearer Token | Update user profile details |
 | `POST` | `/api/v1/users/me/change-password` | Bearer Token | Change password with current password verification |
+| `PATCH` | `/api/v1/users/{id}/role` | Bearer Token | Update workspace role (self or workspace admin) |
+| `DELETE` | `/api/v1/users/{id}/memberships` | Bearer Token | Remove a member from every project, the account is kept |
 
 ### Project Endpoints
 | Method | Endpoint | Access | Description |
@@ -203,9 +206,11 @@ All backend responses are wrapped in a standard JSON envelope:
 | `PATCH` | `/api/v1/projects/{id}` | Bearer Token | Update project information |
 | `DELETE` | `/api/v1/projects/{id}` | Bearer Token | Delete project (Owner/Admin only) |
 | `GET` | `/api/v1/projects/{id}/members` | Bearer Token | List project members |
-| `POST` | `/api/v1/projects/{id}/members` | Bearer Token | Add registered member to project |
+| `POST` | `/api/v1/projects/{id}/members` | Bearer Token | Add a registered member (email or user id) to a project |
 | `PATCH` | `/api/v1/projects/{id}/members/{memberId}` | Bearer Token | Update member role |
 | `DELETE` | `/api/v1/projects/{id}/members/{memberId}` | Bearer Token | Remove member from project |
+| `GET` | `/api/v1/projects/{id}/conversation` | Bearer Token | Get the shared team conversation of a project |
+| `POST` | `/api/v1/projects/{id}/conversation` | Bearer Token | Open (create on demand) the shared team conversation |
 
 ### Task Endpoints
 | Method | Endpoint | Access | Description |
@@ -226,22 +231,32 @@ All backend responses are wrapped in a standard JSON envelope:
 | `DELETE` | `/api/v1/notifications/{id}` | Bearer Token | Dismiss notification |
 | `GET` | `/api/v1/conversations` | Bearer Token | List conversations for user |
 | `POST` | `/api/v1/conversations` | Bearer Token | Create or find direct conversation |
-| `GET` | `/api/v1/conversations/{id}/messages` | Bearer Token | Get conversation messages |
+| `GET` | `/api/v1/conversations/{id}/messages` | Bearer Token | Get conversation messages in chronological order |
+| `GET` | `/api/v1/conversations/{id}/messages/page?page=&size=` | Bearer Token | Paginated message history (page 0 holds the newest messages) |
 | `POST` | `/api/v1/conversations/{id}/messages` | Bearer Token | Post a message to conversation |
+
+### Real-Time Messaging (STOMP over WebSocket)
+| Target | Description |
+|---|---|
+| `ws://localhost:8080/ws` | STOMP endpoint (SockJS fallback: `ws://localhost:8080/ws-sockjs`) |
+| `CONNECT` frame header `Authorization: Bearer <jwt>` | Authenticates the socket with the existing JWT |
+| `SUBSCRIBE /topic/conversations/{conversationId}` | Receive live messages, the server verifies the membership |
+| `SEND /app/conversations/{conversationId}/messages` | Send a message, it is stored first and then broadcast |
+| `/user/queue/errors` | Private error channel for rejected frames |
 
 ---
 
 ## 🧪 Testing & Verification
 
 ### Backend Automated Test Suite
-The backend contains automated tests verifying JWT security, user registration, project isolation, authorization checks, and task status lifecycles.
+The backend contains automated tests verifying JWT security, user registration, project isolation, authorization checks, task status lifecycles, team member removal persistence and the project team conversation.
 
 To run the backend test suite:
 ```powershell
 cd backend
 .\mvnw.cmd test
 ```
-*Current Status: 6/6 tests passing (0 failures, 0 errors).*
+*Current Status: 10/10 tests passing (0 failures, 0 errors).*
 
 To package the production standalone executable JAR:
 ```powershell
