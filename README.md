@@ -118,7 +118,7 @@ cp backend/.env.example backend/.env
 | `DB_PASSWORD` | *(empty)* | MySQL database password |
 | `JWT_SECRET` | *(built-in 256-bit dev key)* | Minimum 256-bit secret key for HMAC-SHA256 signing |
 | `JWT_EXPIRATION_MS` | `86400000` (24 hours) | JWT token lifespan in milliseconds |
-| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173,http://localhost:3000` | Allowed origins for web frontend |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` … `http://localhost:5180` (+ `http://127.0.0.1:5173` … `:5180`, `http://localhost:3000`) | Allowed origins for web frontend. The Vite dev port range is listed because Vite falls back to the next free port when 5173 is taken. |
 | `DEV_SEED_ENABLED` | `false` | When `true`, automatically creates demo seed accounts on startup |
 
 #### 3. Run the Backend
