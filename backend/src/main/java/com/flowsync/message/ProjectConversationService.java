@@ -47,7 +47,7 @@ public class ProjectConversationService {
 
     @Transactional
     public ConversationDto getOrCreateProjectConversation(String projectId, String userId) {
-        Project project = projectRepository.findById(projectId)
+        Project project = projectRepository.findByIdForUpdate(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found."));
         requireProjectMember(project, userId);
 
@@ -104,12 +104,21 @@ public class ProjectConversationService {
 
     @Transactional(readOnly = true)
     public void requireProjectMember(Project project, String userId) {
-        if (project.getCreatedBy() != null && project.getCreatedBy().getId().equals(userId)) {
-            return;
-        }
-        if (!projectMemberRepository.existsByProjectIdAndUserId(project.getId(), userId)) {
+        if (!hasProjectAccess(project, userId)) {
             throw new ForbiddenException("You are not a member of this project.");
         }
+    }
+
+    @Transactional(readOnly = true)
+    public boolean hasProjectAccess(String projectId, String userId) {
+        return projectRepository.findById(projectId)
+                .map(project -> hasProjectAccess(project, userId))
+                .orElse(false);
+    }
+
+    private boolean hasProjectAccess(Project project, String userId) {
+        return (project.getCreatedBy() != null && project.getCreatedBy().getId().equals(userId))
+                || projectMemberRepository.existsByProjectIdAndUserId(project.getId(), userId);
     }
 
     private void syncParticipants(Conversation conversation, Project project) {

@@ -8,7 +8,7 @@ import { isDemoMode } from "@/config/env";
 
 const AppLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { apiError } = useApp();
+  const { apiError, loading } = useApp();
 
   return (
     <div className="flex min-h-screen bg-[var(--surface)] text-[var(--on-surface)]">
@@ -29,8 +29,14 @@ const AppLayout = () => {
           </div>
         ) : null}
         <Topbar onMenu={() => setSidebarOpen(true)} />
-        <main className="min-w-0 flex-1 p-4 sm:p-8">
-          <Outlet />
+        <main className="min-w-0 flex-1 p-4 sm:p-8" aria-busy={loading}>
+          {loading ? (
+            <div className="py-16 text-center text-sm text-[var(--on-surface-variant)]" role="status">
+              Loading workspace...
+            </div>
+          ) : (
+            <Outlet />
+          )}
         </main>
       </div>
     </div>

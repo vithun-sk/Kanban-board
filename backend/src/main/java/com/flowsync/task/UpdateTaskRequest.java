@@ -12,6 +12,9 @@ public class UpdateTaskRequest {
     private List<String> labels;
     private LocalDate startDate;
     private LocalDate dueDate;
+    private boolean assigneeIdProvided;
+    private boolean startDateProvided;
+    private boolean dueDateProvided;
 
     public UpdateTaskRequest() {
     }
@@ -54,6 +57,11 @@ public class UpdateTaskRequest {
 
     public void setAssigneeId(String assigneeId) {
         this.assigneeId = assigneeId;
+        this.assigneeIdProvided = true;
+    }
+
+    public boolean isAssigneeIdProvided() {
+        return assigneeIdProvided;
     }
 
     public List<String> getLabels() {
@@ -70,6 +78,11 @@ public class UpdateTaskRequest {
 
     public void setStartDate(LocalDate startDate) {
         this.startDate = startDate;
+        this.startDateProvided = true;
+    }
+
+    public boolean isStartDateProvided() {
+        return startDateProvided;
     }
 
     public LocalDate getDueDate() {
@@ -78,5 +91,10 @@ public class UpdateTaskRequest {
 
     public void setDueDate(LocalDate dueDate) {
         this.dueDate = dueDate;
+        this.dueDateProvided = true;
+    }
+
+    public boolean isDueDateProvided() {
+        return dueDateProvided;
     }
 }

@@ -110,8 +110,7 @@ public class UserService {
 
     /**
      * Removes a user from the projects they belong to. The FlowSync account itself is
-     * never deleted, and a user can only be removed from projects where the caller is the
-     * project owner, a project admin, or the member themselves.
+     * never deleted, and only each project's creator can remove its membership.
      */
     @Transactional
     public void removeProjectMemberships(String userId, String actingUserId) {
@@ -125,15 +124,9 @@ public class UserService {
 
         for (ProjectMember membership : memberships) {
             Project project = membership.getProject();
-            if (project.getCreatedBy() != null && project.getCreatedBy().getId().equals(actingUserId)) {
-                // the caller owns the project
-            } else if (membership.getUser() != null && membership.getUser().getId().equals(actingUserId)) {
-                // the caller removes themselves
-            } else if (isProjectAdmin(project, actingUserId)) {
-                // the caller administers the project
-            } else {
+            if (project.getCreatedBy() == null || !project.getCreatedBy().getId().equals(actingUserId)) {
                 throw new ForbiddenException(
-                        "You can only remove members from projects you own or administer.");
+                        "Only the project leader can remove a member from this project.");
             }
         }
 
@@ -142,13 +135,6 @@ public class UserService {
             projectMemberRepository.delete(membership);
             projectConversationService.removeParticipant(projectId, userId);
         }
-    }
-
-    private boolean isProjectAdmin(Project project, String userId) {
-        return projectMemberRepository.findByProjectIdAndUserId(project.getId(), userId)
-                .map(membership -> "Owner".equalsIgnoreCase(membership.getRole())
-                        || "Admin".equalsIgnoreCase(membership.getRole()))
-                .orElse(false);
     }
 
     /**

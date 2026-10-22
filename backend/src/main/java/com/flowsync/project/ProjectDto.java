@@ -34,7 +34,7 @@ public class ProjectDto {
         ProjectDto dto = new ProjectDto();
         dto.setId(project.getId());
         dto.setName(project.getName());
-        dto.setDescription(project.getDescription());
+        dto.setDescription(project.getDescription() != null ? project.getDescription() : "");
         dto.setStatus(project.getStatus());
         dto.setVisibility(project.getVisibility());
         dto.setColor(project.getColor());

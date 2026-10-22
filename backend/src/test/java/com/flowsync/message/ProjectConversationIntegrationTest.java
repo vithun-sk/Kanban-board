@@ -166,7 +166,16 @@ public class ProjectConversationIntegrationTest {
         mockMvc.perform(get("/api/v1/conversations/" + conversationId + "/messages")
                         .header("Authorization", "Bearer " + memberToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(1));
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].senderName").value("Member"));
+
+        mockMvc.perform(get("/api/v1/notifications")
+                        .header("Authorization", "Bearer " + ownerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].type").value("message"))
+                .andExpect(jsonPath("$.data[0].relatedType").value("project"))
+                .andExpect(jsonPath("$.data[0].relatedId").value(projectId))
+                .andExpect(jsonPath("$.data[0].read").value(false));
 
         // Removing the member from the project also removes the conversation access.
         JsonNode members = objectMapper.readTree(mockMvc.perform(get("/api/v1/projects/" + projectId + "/members")

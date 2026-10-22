@@ -1,9 +1,11 @@
 package com.flowsync.task;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowsync.auth.RegisterRequest;
 import com.flowsync.notification.NotificationService;
 import com.flowsync.project.CreateProjectRequest;
+import com.flowsync.project.UpdateProjectRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -13,8 +15,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.LocalDate;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -108,6 +112,74 @@ public class TaskAndNotificationIntegrationTest {
         mockMvc.perform(delete("/api/v1/tasks/" + taskId)
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void explicitNullUpdatesClearAssigneeAndDatesAfterReload() throws Exception {
+        String token = registerAndGetToken("Update Worker", "update-worker@example.com");
+        String userId = getUserIdFromToken(token);
+
+        CreateProjectRequest projectRequest = new CreateProjectRequest();
+        projectRequest.setName("Date clearing project");
+        projectRequest.setStartDate(LocalDate.of(2026, 1, 1));
+        projectRequest.setDueDate(LocalDate.of(2026, 12, 31));
+        MvcResult projectResult = mockMvc.perform(post("/api/v1/projects")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(projectRequest)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String projectId = objectMapper.readTree(projectResult.getResponse().getContentAsString())
+                .get("data").get("id").asText();
+
+        UpdateProjectRequest clearProjectDates = new UpdateProjectRequest();
+        clearProjectDates.setStartDate(null);
+        clearProjectDates.setDueDate(null);
+        mockMvc.perform(patch("/api/v1/projects/" + projectId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(clearProjectDates)))
+                .andExpect(status().isOk());
+
+        JsonNode savedProject = objectMapper.readTree(mockMvc.perform(get("/api/v1/projects/" + projectId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString()).get("data");
+        assertTrue(savedProject.get("startDate").isNull());
+        assertTrue(savedProject.get("dueDate").isNull());
+
+        CreateTaskRequest taskRequest = new CreateTaskRequest();
+        taskRequest.setProjectId(projectId);
+        taskRequest.setTitle("Task with assignment and dates");
+        taskRequest.setAssigneeId(userId);
+        taskRequest.setStartDate(LocalDate.of(2026, 2, 1));
+        taskRequest.setDueDate(LocalDate.of(2026, 3, 1));
+        MvcResult taskResult = mockMvc.perform(post("/api/v1/tasks")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(taskRequest)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String taskId = objectMapper.readTree(taskResult.getResponse().getContentAsString())
+                .get("data").get("id").asText();
+
+        UpdateTaskRequest clearTaskFields = new UpdateTaskRequest();
+        clearTaskFields.setAssigneeId(null);
+        clearTaskFields.setStartDate(null);
+        clearTaskFields.setDueDate(null);
+        mockMvc.perform(patch("/api/v1/tasks/" + taskId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(clearTaskFields)))
+                .andExpect(status().isOk());
+
+        JsonNode savedTask = objectMapper.readTree(mockMvc.perform(get("/api/v1/tasks/" + taskId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString()).get("data");
+        assertTrue(savedTask.get("assigneeId").isNull());
+        assertTrue(savedTask.get("startDate").isNull());
+        assertTrue(savedTask.get("dueDate").isNull());
     }
 
     @Test

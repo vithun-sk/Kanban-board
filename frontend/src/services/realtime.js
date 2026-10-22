@@ -7,6 +7,10 @@ import { API_BASE_URL } from "@/config/env";
  * The connection is authenticated with the same JWT that the REST API uses. The token is
  * sent in the CONNECT frame, and the server validates the conversation membership before
  * a subscription or a publish is accepted.
+ *
+ * The client is the single source of truth for the connection status so the UI can show
+ * honestly whether live delivery is available. Sending messages always goes through the
+ * REST API, which stores the message and lets the server broadcast it to every member.
  */
 class RealtimeClient {
   constructor() {
@@ -14,14 +18,20 @@ class RealtimeClient {
     this.token = null;
     this.status = "idle";
     this.statusListeners = new Set();
-    this.subscriptions = new Map();
     this.errorListeners = new Set();
+    this.subscriptions = new Map();
+    this.stompSubscriptions = new Map();
   }
 
   get socketUrl() {
     // The STOMP endpoint is served from the server root, next to the /api/v1 prefix.
     const base = API_BASE_URL.replace(/^http/i, "ws").replace(/\/api\/v1\/?$/, "");
+    if (!base) return null;
     return `${base}/ws`;
+  }
+
+  get isConnected() {
+    return Boolean(this.client?.connected);
   }
 
   onStatus(listener) {
@@ -36,6 +46,7 @@ class RealtimeClient {
   }
 
   setStatus(status) {
+    if (this.status === status) return;
     this.status = status;
     this.statusListeners.forEach((listener) => listener(status));
   }
@@ -46,13 +57,20 @@ class RealtimeClient {
 
   connect(token) {
     if (!token) return;
-    if (this.client && this.token === token && this.client.connected) return;
+    if (this.client && this.token === token && (this.client.connected || this.client.active)) return;
+
+    const socketUrl = this.socketUrl;
+    if (!socketUrl) {
+      this.setStatus("error");
+      this.emitError("The real-time endpoint is not configured.");
+      return;
+    }
 
     this.token = token;
-    this.disconnect();
+    this.teardownClient();
 
     const client = new Client({
-      brokerURL: this.socketUrl,
+      brokerURL: socketUrl,
       connectHeaders: { Authorization: `Bearer ${token}` },
       reconnectDelay: 4000,
       heartbeatIncoming: 10000,
@@ -61,6 +79,7 @@ class RealtimeClient {
         this.setStatus("connected");
         this.resubscribe();
       },
+      onWebSocketOpen: () => this.setStatus("connecting"),
       onWebSocketClose: () => this.setStatus("disconnected"),
       onStompError: (frame) => {
         const message = frame?.headers?.message || "Real-time connection error.";
@@ -70,28 +89,52 @@ class RealtimeClient {
     });
 
     this.client = client;
+    this.setStatus("connecting");
     client.activate();
   }
 
-  disconnect() {
+  /**
+   * Closes the socket but keeps the registered conversation subscriptions, so a later
+   * connect() restores them instead of leaving the UI silently unsubscribed.
+   */
+  teardownClient() {
+    this.stompSubscriptions.forEach((subscription) => {
+      try {
+        subscription.unsubscribe();
+      } catch {
+        // the socket is already gone
+      }
+    });
+    this.stompSubscriptions.clear();
     if (this.client) {
       this.client.deactivate();
       this.client = null;
     }
+  }
+
+  disconnect() {
+    this.teardownClient();
+    this.token = null;
     this.subscriptions.clear();
+    this.stompSubscriptions.clear();
     this.setStatus("idle");
   }
 
   resubscribe() {
     if (!this.client?.connected) return;
-    this.subscriptions.forEach((handler, destination) => {
-      this.client.subscribe(destination, (message) => {
+    this.stompSubscriptions.forEach((subscription) => subscription.unsubscribe());
+    this.stompSubscriptions.clear();
+    this.subscriptions.forEach((handlers, destination) => {
+      const subscription = this.client.subscribe(destination, (message) => {
+        let payload = message.body;
         try {
-          handler(JSON.parse(message.body));
+          payload = JSON.parse(message.body);
         } catch {
-          handler(message.body);
+          payload = message.body;
         }
+        handlers.forEach((handler) => handler(payload));
       });
+      this.stompSubscriptions.set(destination, subscription);
     });
   }
 
@@ -99,19 +142,26 @@ class RealtimeClient {
    * Subscribes to a conversation topic. The returned function removes the subscription.
    */
   subscribe(conversationId, handler) {
+    if (!conversationId || typeof handler !== "function") return () => {};
     const destination = `/topic/conversations/${conversationId}`;
-    this.subscriptions.set(destination, handler);
-    if (this.client?.connected) {
-      this.client.subscribe(destination, (message) => {
-        try {
-          handler(JSON.parse(message.body));
-        } catch {
-          handler(message.body);
-        }
-      });
+
+    if (!this.subscriptions.has(destination)) {
+      this.subscriptions.set(destination, new Set());
     }
+    const handlers = this.subscriptions.get(destination);
+    handlers.add(handler);
+
+    if (this.client?.connected) {
+      this.resubscribe();
+    }
+
     return () => {
-      this.subscriptions.delete(destination);
+      const current = this.subscriptions.get(destination);
+      if (!current) return;
+      current.delete(handler);
+      if (current.size === 0) {
+        this.subscriptions.delete(destination);
+      }
     };
   }
 

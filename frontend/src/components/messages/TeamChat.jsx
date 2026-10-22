@@ -1,8 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, MessageSquare, Send } from "lucide-react";
+import { Loader2, MessageSquare, Send, Wifi, WifiOff } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { useToast } from "@/context/ToastContext";
 import { formatDateTime } from "@/lib/dates";
+
+const CONNECTION_LABELS = {
+  connected: { text: "Live", className: "text-emerald-700 bg-emerald-500/10" },
+  connecting: { text: "Connecting…", className: "text-amber-700 bg-amber-500/10" },
+  disconnected: { text: "Reconnecting…", className: "text-amber-700 bg-amber-500/10" },
+  error: { text: "Live updates unavailable", className: "text-[var(--error)] bg-[var(--error-container)]" },
+  idle: { text: "Live updates off", className: "text-[var(--outline)] bg-[var(--surface-container)]" },
+};
 
 /**
  * Conversation panel that is used by the project workspace and the messages page.
@@ -21,6 +29,7 @@ const TeamChat = ({
     members,
     messageStatus,
     messagePages,
+    realtimeStatus,
     currentUser,
     sendMessage,
     loadMessages,
@@ -31,6 +40,7 @@ const TeamChat = ({
   const [sending, setSending] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const bottomRef = useRef(null);
+  const loadedRef = useRef(null);
 
   const thread = useMemo(
     () => messages.filter((message) => message.conversationId === conversationId),
@@ -38,11 +48,20 @@ const TeamChat = ({
   );
   const status = messageStatus[conversationId] || {};
   const page = messagePages[conversationId] || {};
+  const connection = CONNECTION_LABELS[realtimeStatus] || CONNECTION_LABELS.idle;
 
   useEffect(() => {
     if (!conversationId) return undefined;
     return subscribeToConversation(conversationId, () => {});
   }, [conversationId, subscribeToConversation]);
+
+  useEffect(() => {
+    if (!conversationId || loadedRef.current === conversationId) return;
+    loadedRef.current = conversationId;
+    loadMessages(conversationId).catch((err) => {
+      push(err.message || "Failed to load messages.", "error");
+    });
+  }, [conversationId, loadMessages, push]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
@@ -88,12 +107,30 @@ const TeamChat = ({
   return (
     <div className={`flex flex-col overflow-hidden rounded-xl border border-[var(--outline-variant)] ${className}`}>
       <div className="border-b border-[var(--outline-variant)] px-5 py-3">
-        <h2 className="flex items-center gap-2 font-semibold">
-          <MessageSquare size={16} />
-          {title}
-        </h2>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h2 className="flex items-center gap-2 font-semibold">
+            <MessageSquare size={16} />
+            {title}
+          </h2>
+          <span
+            className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ${connection.className}`}
+            title={
+              realtimeStatus === "connected"
+                ? "Messages are delivered to the other members in real time."
+                : "Messages are still stored and sent over the API, but live delivery is unavailable."
+            }
+          >
+            {realtimeStatus === "connected" ? <Wifi size={12} /> : <WifiOff size={12} />}
+            {connection.text}
+          </span>
+        </div>
         {description ? (
           <p className="mt-0.5 text-xs text-[var(--outline)]">{description}</p>
+        ) : null}
+        {realtimeStatus !== "connected" ? (
+          <p className="mt-1 text-xs text-[var(--outline)]">
+            Sending and loading messages still work over the API, they are just not pushed live.
+          </p>
         ) : null}
       </div>
 

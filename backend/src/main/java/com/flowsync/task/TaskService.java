@@ -81,6 +81,7 @@ public class TaskService {
 
         User assignee = null;
         if (request.getAssigneeId() != null && !request.getAssigneeId().isBlank()) {
+            projectService.validateProjectLeader(project, userId);
             assignee = userRepository.findById(request.getAssigneeId())
                     .orElseThrow(() -> new ResourceNotFoundException("Assignee not found."));
             boolean isMember = memberRepository.existsByProjectIdAndUserId(project.getId(), assignee.getId())
@@ -121,6 +122,9 @@ public class TaskService {
         Task task = taskRepository.findByIdWithProject(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found."));
         projectService.validateProjectAccess(task.getProject(), userId);
+        if (request.isAssigneeIdProvided()) {
+            projectService.validateProjectLeader(task.getProject(), userId);
+        }
 
         if (request.getTitle() != null && !request.getTitle().isBlank()) {
             task.setTitle(request.getTitle().trim());
@@ -134,15 +138,15 @@ public class TaskService {
         if (request.getPriority() != null) {
             task.setPriority(TaskPriority.fromString(request.getPriority()));
         }
-        if (request.getStartDate() != null) {
+        if (request.isStartDateProvided()) {
             task.setStartDate(request.getStartDate());
         }
-        if (request.getDueDate() != null) {
+        if (request.isDueDateProvided()) {
             task.setDueDate(request.getDueDate());
         }
 
-        if (request.getAssigneeId() != null) {
-            if (request.getAssigneeId().isBlank()) {
+        if (request.isAssigneeIdProvided()) {
+            if (request.getAssigneeId() == null || request.getAssigneeId().isBlank()) {
                 task.setAssignee(null);
             } else {
                 User assignee = userRepository.findById(request.getAssigneeId())
@@ -184,7 +188,7 @@ public class TaskService {
     public void deleteTask(String taskId, String userId) {
         Task task = taskRepository.findByIdWithProject(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found."));
-        projectService.validateProjectAccess(task.getProject(), userId);
+        projectService.validateProjectLeader(task.getProject(), userId);
 
         taskRepository.delete(task);
     }

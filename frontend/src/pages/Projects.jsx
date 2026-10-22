@@ -12,7 +12,7 @@ import { PROJECT_STATUS_LIST } from "@/constants";
 
 const Projects = () => {
   const navigate = useNavigate();
-  const { projects, updateProject, deleteProject, submitting } = useApp();
+  const { projects, currentUser, isDemoMode, updateProject, deleteProject, submitting } = useApp();
   const { push } = useToast();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
@@ -23,8 +23,8 @@ const Projects = () => {
   const filteredProjects = useMemo(() => {
     const result = projects.filter((project) => {
       const matchesSearch =
-        project.name.toLowerCase().includes(search.toLowerCase()) ||
-        project.description.toLowerCase().includes(search.toLowerCase());
+        (project.name || "").toLowerCase().includes(search.toLowerCase()) ||
+        (project.description || "").toLowerCase().includes(search.toLowerCase());
       const matchesFilter = filter === "All" || project.status === filter;
       return matchesSearch && matchesFilter;
     });
@@ -116,6 +116,14 @@ const Projects = () => {
               <ProjectCard
                 key={project.id}
                 project={project}
+                canManage={
+                  isDemoMode ||
+                  Boolean(
+                    project.createdById &&
+                    currentUser?.id &&
+                    String(project.createdById) === String(currentUser.id),
+                  )
+                }
                 onOpen={() => navigate(`/projects/${project.id}`)}
                 onEdit={() => setEditing(project)}
                 onDelete={() => setDeleting(project)}
@@ -164,9 +172,13 @@ const Projects = () => {
             submitting={submitting}
             onCancel={() => setEditing(null)}
             onSubmit={async (payload) => {
-              updateProject(editing.id, payload);
-              push("Project updated successfully.");
-              setEditing(null);
+              try {
+                await updateProject(editing.id, payload);
+                push("Project updated successfully.");
+                setEditing(null);
+              } catch (err) {
+                push(err.message || "Failed to update the project.", "error");
+              }
             }}
           />
         </Modal>
@@ -179,10 +191,15 @@ const Projects = () => {
           confirmLabel="Delete project"
           destructive
           onClose={() => setDeleting(null)}
-          onConfirm={() => {
-            deleteProject(deleting.id);
-            push("Project deleted successfully.");
-            setDeleting(null);
+          onConfirm={async () => {
+            try {
+              await deleteProject(deleting.id);
+              push("Project deleted successfully.");
+              setDeleting(null);
+            } catch (err) {
+              push(err.message || "Failed to delete the project.", "error");
+              setDeleting(null);
+            }
           }}
         />
       ) : null}

@@ -24,6 +24,7 @@ const Home = () => {
     activity,
     metrics,
     members,
+    isDemoMode,
     updateProject,
     deleteProject,
     updateTask,
@@ -176,6 +177,14 @@ const Home = () => {
               <ProjectCard
                 key={project.id}
                 project={project}
+                canManage={
+                  isDemoMode ||
+                  Boolean(
+                    project.createdById &&
+                    currentUser?.id &&
+                    String(project.createdById) === String(currentUser.id),
+                  )
+                }
                 onOpen={() => navigate(`/projects/${project.id}`)}
                 onEdit={() => setEditingProject(project)}
                 onDelete={() => setDeletingProject(project)}
@@ -266,6 +275,8 @@ const Home = () => {
           onClose={() => setSelectedTask(null)}
           onSave={updateTask}
           onDelete={deleteTask}
+          currentUser={currentUser}
+          isDemoMode={isDemoMode}
         />
       ) : null}
       {showCreate ? <CreateTaskModal onClose={() => setShowCreate(false)} /> : null}

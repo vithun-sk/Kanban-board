@@ -11,7 +11,7 @@ import { PRIORITY_RANK, TASK_STATUS } from "@/constants";
 import { compareISODates } from "@/lib/dates";
 
 const Tasks = () => {
-  const { tasks, projects, members, updateTask, deleteTask } = useApp();
+  const { tasks, projects, members, currentUser, isDemoMode, updateTask, deleteTask } = useApp();
   const [params] = useSearchParams();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("All");
@@ -32,9 +32,10 @@ const Tasks = () => {
 
   const filteredTasks = useMemo(() => {
     const result = tasks.filter((task) => {
+      const description = task.description || "";
       const matchesSearch =
-        task.title.toLowerCase().includes(search.toLowerCase()) ||
-        task.description.toLowerCase().includes(search.toLowerCase());
+        (task.title || "").toLowerCase().includes(search.toLowerCase()) ||
+        description.toLowerCase().includes(search.toLowerCase());
       const matchesStatus = status === "All" || task.status === status;
       const matchesPriority = priority === "All" || task.priority === priority;
       const matchesProject = projectId === "All" || task.projectId === projectId;
@@ -43,11 +44,11 @@ const Tasks = () => {
     });
 
     const sorted = [...result];
-    if (sort === "oldest") sorted.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    if (sort === "oldest") sorted.sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
     else if (sort === "priority") sorted.sort((a, b) => (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9));
     else if (sort === "due") sorted.sort((a, b) => compareISODates(a.dueDate, b.dueDate));
-    else if (sort === "title") sorted.sort((a, b) => a.title.localeCompare(b.title));
-    else sorted.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    else if (sort === "title") sorted.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+    else sorted.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
     return sorted;
   }, [tasks, search, status, priority, sort, projectId, assigneeId]);
 
@@ -146,6 +147,8 @@ const Tasks = () => {
           onClose={() => setSelectedTask(null)}
           onSave={updateTask}
           onDelete={deleteTask}
+          currentUser={currentUser}
+          isDemoMode={isDemoMode}
         />
       ) : null}
       {showCreate ? <CreateTaskModal onClose={() => setShowCreate(false)} /> : null}

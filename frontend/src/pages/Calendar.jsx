@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import CreateTaskModal from "@/components/tasks/CreateTaskModal";
 import TaskDetailsModal from "@/components/tasks/TaskDetailsModal";
 import Modal from "@/components/ui/Modal";
@@ -8,10 +9,12 @@ import { isOverdue, isSameDay, parseISODate } from "@/lib/dates";
 import { TASK_STATUS } from "@/constants";
 
 const Calendar = () => {
+  const navigate = useNavigate();
   const { tasks, members, projects, updateTask, deleteTask } = useApp();
   const [currentDate, setCurrentDate] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
+  const [selectedProjectEvent, setSelectedProjectEvent] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
 
   const year = currentDate.getFullYear();
@@ -24,35 +27,62 @@ const Calendar = () => {
   );
   const today = new Date();
 
-  const dayTaskMap = useMemo(() => {
+  const dayEventMap = useMemo(() => {
     const map = new Map();
     for (let day = 1; day <= daysInMonth; day++) {
       const cell = new Date(year, month, day);
-      const matches = tasks.filter((task) => {
+      const matches = [];
+      // Project deadlines
+      for (const project of projects || []) {
+        const due = parseISODate(project.dueDate || project.deadline);
+        if (due && isSameDay(due, cell)) {
+          matches.push({ type: "project", ...project });
+        }
+      }
+      // Task deadlines
+      for (const task of tasks) {
         const due = parseISODate(task.dueDate);
-        return due && isSameDay(due, cell);
-      });
+        if (due && isSameDay(due, cell)) {
+          // avoid duplicates if somehow same id? different types
+          matches.push({ type: "task", ...task });
+        }
+      }
       map.set(day, matches);
     }
     return map;
-  }, [tasks, year, month, daysInMonth]);
+  }, [projects, tasks, year, month, daysInMonth]);
 
-  const getTasksForDay = (day) => {
+  const getEventsForDay = (day) => {
     if (!day) return [];
-    return dayTaskMap.get(day) || [];
+    return dayEventMap.get(day) || [];
   };
 
   const selectedEvents = useMemo(() => {
     if (!selectedDate) return [];
-    return dayTaskMap.get(selectedDate) || [];
-  }, [selectedDate, dayTaskMap]);
+    return dayEventMap.get(selectedDate) || [];
+  }, [selectedDate, dayEventMap]);
 
   const upcoming = useMemo(() => {
-    return tasks
-      .filter((task) => task.dueDate && task.status !== TASK_STATUS.DONE)
-      .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
-      .slice(0, 3);
-  }, [tasks]);
+    const events = [];
+    for (const project of projects || []) {
+      if (project.dueDate || project.deadline) {
+        const due = parseISODate(project.dueDate || project.deadline);
+        if (due && due >= new Date(new Date().setHours(0,0,0,0))) {
+          events.push({ type: "project", date: project.dueDate || project.deadline, ...project });
+        }
+      }
+    }
+    for (const task of tasks) {
+      if (task.dueDate && task.status !== TASK_STATUS.DONE) {
+        const due = parseISODate(task.dueDate);
+        if (due && due >= new Date(new Date().setHours(0,0,0,0))) {
+          events.push({ type: "task", date: task.dueDate, ...task });
+        }
+      }
+    }
+    events.sort((a, b) => (a.date || a.dueDate || "").localeCompare(b.date || b.dueDate || ""));
+    return events.slice(0, 3);
+  }, [projects, tasks]);
 
   const selected = tasks.find((task) => task.id === selectedTask?.id) || null;
 
@@ -61,9 +91,9 @@ const Calendar = () => {
       <section className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold">Calendar</h1>
-          <p className="mt-2 text-[var(--on-surface-variant)]">
-            Task deadlines from workspace data.
-          </p>
+        <p className="mt-2 text-[var(--on-surface-variant)]">
+          Project deadlines and task deadlines from workspace data.
+        </p>
         </div>
         <button
           type="button"
@@ -121,7 +151,7 @@ const Calendar = () => {
 
         <div className="grid grid-cols-7">
           {days.map((day, index) => {
-            const events = getTasksForDay(day);
+            const events = getEventsForDay(day);
             const isToday =
               day &&
               isSameDay(new Date(year, month, day), today);
@@ -151,11 +181,21 @@ const Calendar = () => {
                     </div>
                     <div className="mt-2 hidden space-y-1 sm:block">
                       {events.slice(0, 2).map((event) => {
+                        if (event.type === "project") {
+                          return (
+                            <div
+                              key={`p-${event.id}`}
+                              className="truncate rounded-md px-2 py-1 text-xs bg-amber-500/15 text-amber-700"
+                            >
+                              {event.name}
+                            </div>
+                          );
+                        }
                         const isDone = event.status === TASK_STATUS.DONE || event.status === "DONE";
                         const overdue = isOverdue(event.dueDate, event.status);
                         return (
                           <div
-                            key={event.id}
+                            key={`t-${event.id}`}
                             className={`truncate rounded-md px-2 py-1 text-xs ${
                               isDone
                                 ? "bg-emerald-500/15 text-emerald-700"
@@ -188,14 +228,19 @@ const Calendar = () => {
           {upcoming.map((event) => (
             <button
               type="button"
-              key={event.id}
-              onClick={() => setSelectedTask(event)}
+              key={`${event.type}-${event.id}`}
+              onClick={() => {
+                if (event.type === "task") setSelectedTask(event);
+                else if (event.type === "project") {
+                  setSelectedProjectEvent(event);
+                }
+              }}
               className="rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container)] p-5 text-left transition hover:border-[var(--primary)]"
             >
-              <CalendarDays className="text-[var(--primary)]" size={18} />
-              <h3 className="mt-4 font-semibold">{event.title}</h3>
-              <p className="mt-2 text-sm text-[var(--outline)]">{event.projectName}</p>
-              <p className="mt-4 text-xs font-medium text-[var(--primary)]">{event.dueDate}</p>
+              <CalendarDays className={event.type === "project" ? "text-amber-600" : "text-[var(--primary)]"} size={18} />
+              <h3 className="mt-4 font-semibold">{event.type === "project" ? event.name : event.title}</h3>
+              <p className="mt-2 text-sm text-[var(--outline)]">{event.type === "project" ? "Project" : event.projectName}</p>
+              <p className="mt-4 text-xs font-medium text-[var(--primary)]">{event.date || event.dueDate || event.deadline}</p>
             </button>
           ))}
         </div>
@@ -204,7 +249,7 @@ const Calendar = () => {
       {selectedDate ? (
         <Modal
           title={`${monthName} ${selectedDate}, ${year}`}
-          description="Task deadlines scheduled for this day."
+          description="Deadlines scheduled for this day (projects and tasks)."
           onClose={() => setSelectedDate(null)}
         >
           {selectedEvents.length > 0 ? (
@@ -212,15 +257,17 @@ const Calendar = () => {
               {selectedEvents.map((event) => (
                 <button
                   type="button"
-                  key={event.id}
-                  onClick={() => setSelectedTask(event)}
+                  key={`${event.type}-${event.id}`}
+                  onClick={() => {
+                    if (event.type === "task") setSelectedTask(event);
+                    else if (event.type === "project") setSelectedProjectEvent(event);
+                  }}
                   className="w-full rounded-xl border border-[var(--outline-variant)] p-4 text-left transition hover:bg-[var(--surface-container-high)]"
                 >
-                  <h3 className="font-semibold">{event.title}</h3>
-                  <p className="mt-1 text-sm text-[var(--outline)]">{event.projectName}</p>
+                  <h3 className="font-semibold">{event.type === "project" ? event.name : event.title}</h3>
+                  <p className="mt-1 text-sm text-[var(--outline)]">{event.type === "project" ? "Project" : event.projectName}</p>
                   <p className="mt-2 text-xs">
-                    {event.status} · {event.priority}
-                    {isOverdue(event.dueDate, event.status) ? " · Overdue" : ""}
+                    {event.type === "project" ? `Due: ${event.dueDate || event.deadline}` : `${event.status} · ${event.priority}${isOverdue(event.dueDate, event.status) ? " · Overdue" : ""}`}
                   </p>
                 </button>
               ))}
@@ -231,15 +278,30 @@ const Calendar = () => {
         </Modal>
       ) : null}
 
-      {selected ? (
-        <TaskDetailsModal
-          task={selected}
-          members={members}
-          projects={projects}
-          onClose={() => setSelectedTask(null)}
-          onSave={updateTask}
-          onDelete={deleteTask}
-        />
+      {selectedProjectEvent ? (
+        <Modal
+          title={selectedProjectEvent.name}
+          description={selectedProjectEvent.description || "Project details"}
+          onClose={() => setSelectedProjectEvent(null)}
+        >
+          <div className="space-y-2 text-sm">
+            <p><span className="font-medium">Status:</span> {selectedProjectEvent.status}</p>
+            <p><span className="font-medium">Due date:</span> {selectedProjectEvent.dueDate || selectedProjectEvent.deadline || "Not set"}</p>
+            <p><span className="font-medium">Start date:</span> {selectedProjectEvent.startDate || "Not set"}</p>
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  navigate(`/projects/${selectedProjectEvent.id}`);
+                  setSelectedProjectEvent(null);
+                }}
+                className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm text-white"
+              >
+                Open project
+              </button>
+            </div>
+          </div>
+        </Modal>
       ) : null}
       {showCreate ? <CreateTaskModal onClose={() => setShowCreate(false)} /> : null}
     </div>

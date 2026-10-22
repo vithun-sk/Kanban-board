@@ -128,10 +128,10 @@ public class ProjectService {
         if (request.getColor() != null) {
             project.setColor(request.getColor());
         }
-        if (request.getStartDate() != null) {
+        if (request.isStartDateProvided()) {
             project.setStartDate(request.getStartDate());
         }
-        if (request.getEffectiveDueDate() != null) {
+        if (request.isEffectiveDueDateProvided()) {
             project.setDueDate(request.getEffectiveDueDate());
         }
 
@@ -161,7 +161,7 @@ public class ProjectService {
 
     @Transactional
     public ProjectMemberDto addProjectMember(String projectId, AddMemberRequest request, String userId) {
-        Project project = projectRepository.findById(projectId)
+        Project project = projectRepository.findByIdForUpdate(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found."));
 
         validateProjectModification(project, userId);
@@ -295,13 +295,13 @@ public class ProjectService {
         }
     }
 
-    private void validateProjectModification(Project project, String userId) {
+    public void validateProjectLeader(Project project, String userId) {
         if (project.getCreatedBy().getId().equals(userId)) return;
-        ProjectMember pm = memberRepository.findByProjectIdAndUserId(project.getId(), userId)
-                .orElseThrow(() -> new ForbiddenException("You do not have permission to modify this project."));
-        if (!"Owner".equalsIgnoreCase(pm.getRole()) && !"Admin".equalsIgnoreCase(pm.getRole())) {
-            throw new ForbiddenException("Only project owners or administrators can perform this action.");
-        }
+        throw new ForbiddenException("Only the project leader can perform this action.");
+    }
+
+    private void validateProjectModification(Project project, String userId) {
+        validateProjectLeader(project, userId);
     }
 
     private ProjectDto toDto(Project project) {

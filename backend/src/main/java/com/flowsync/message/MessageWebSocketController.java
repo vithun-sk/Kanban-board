@@ -19,6 +19,9 @@ import java.util.Map;
  * Real-time delivery for project team conversations. Every message is persisted first and
  * only then broadcast to the conversation topic, so a reconnecting client never loses
  * messages that were already stored.
+ *
+ * The broadcast itself is done by {@link MessageBroadcaster} once the sending transaction
+ * committed, which keeps the REST endpoint and this endpoint free of duplicate messages.
  */
 @Controller
 public class MessageWebSocketController {
@@ -39,8 +42,7 @@ public class MessageWebSocketController {
             @Valid @Payload SendMessageRequest request,
             Principal principal
     ) {
-        MessageDto saved = messageService.sendMessage(conversationId, request, principal.getName());
-        messagingTemplate.convertAndSend("/topic/conversations/" + conversationId, saved);
+        messageService.sendMessage(conversationId, request, principal.getName());
     }
 
     @MessageExceptionHandler(Exception.class)

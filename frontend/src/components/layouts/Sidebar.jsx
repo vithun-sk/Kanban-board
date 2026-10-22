@@ -24,7 +24,8 @@ const linkClass = ({ isActive }) =>
 
 const Sidebar = ({ open = false, onClose }) => {
   const navigate = useNavigate();
-  const { currentUser, unreadCount, refreshSession } = useApp();
+  const { currentUser, unreadCount, pendingInvitationCount, refreshSession } = useApp();
+  const communicationCount = unreadCount + pendingInvitationCount;
 
   const handleLogout = async () => {
     await logout();
@@ -107,9 +108,9 @@ const Sidebar = ({ open = false, onClose }) => {
                 <Bell size={19} />
                 Notifications
               </span>
-              {unreadCount > 0 ? (
+              {communicationCount > 0 ? (
                 <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs">
-                  {unreadCount}
+                  {communicationCount}
                 </span>
               ) : null}
             </NavLink>

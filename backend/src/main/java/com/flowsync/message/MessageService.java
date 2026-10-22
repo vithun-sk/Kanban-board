@@ -5,6 +5,7 @@ import com.flowsync.exception.ForbiddenException;
 import com.flowsync.exception.ResourceNotFoundException;
 import com.flowsync.user.User;
 import com.flowsync.user.UserRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,17 +22,23 @@ public class MessageService {
     private final ConversationMemberRepository conversationMemberRepository;
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
+    private final ProjectConversationService projectConversationService;
 
     public MessageService(
             ConversationRepository conversationRepository,
             ConversationMemberRepository conversationMemberRepository,
             MessageRepository messageRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            ApplicationEventPublisher eventPublisher,
+            ProjectConversationService projectConversationService
     ) {
         this.conversationRepository = conversationRepository;
         this.conversationMemberRepository = conversationMemberRepository;
         this.messageRepository = messageRepository;
         this.userRepository = userRepository;
+        this.eventPublisher = eventPublisher;
+        this.projectConversationService = projectConversationService;
     }
 
     @Transactional(readOnly = true)
@@ -107,7 +114,25 @@ public class MessageService {
         conversation.setUpdatedAt(Instant.now());
         conversationRepository.save(conversation);
 
-        return MessageDto.fromEntity(saved);
+        MessageDto dto = MessageDto.fromEntity(saved);
+        ProjectMessageNotificationEvent notificationEvent = null;
+        if (conversation.getProjectId() != null) {
+            List<String> recipientIds = conversation.getMembers().stream()
+                    .map(ConversationMember::getUser)
+                    .filter(Objects::nonNull)
+                    .map(User::getId)
+                    .filter(memberId -> !memberId.equals(sender.getId()))
+                    .toList();
+            notificationEvent = new ProjectMessageNotificationEvent(
+                    recipientIds, conversation.getTitle(), sender.getName(), conversation.getProjectId());
+        }
+        // The broadcast is executed after the transaction committed, so a subscriber
+        // always receives a message that is already stored in the database.
+        eventPublisher.publishEvent(new MessageSentEvent(dto));
+        if (notificationEvent != null) {
+            eventPublisher.publishEvent(notificationEvent);
+        }
+        return dto;
     }
 
     /**
@@ -166,15 +191,24 @@ public class MessageService {
 
     @Transactional(readOnly = true)
     public void validateConversationMembership(String conversationId, String userId) {
-        boolean isMember = conversationMemberRepository.existsByConversationIdAndUserId(conversationId, userId);
-        if (!isMember) {
+        Conversation conversation = conversationRepository.findById(conversationId).orElse(null);
+        boolean isConversationMember =
+                conversationMemberRepository.existsByConversationIdAndUserId(conversationId, userId);
+        boolean isProjectMember = conversation != null
+                && (conversation.getProjectId() == null
+                    || projectConversationService.hasProjectAccess(conversation.getProjectId(), userId));
+        if (!isConversationMember || !isProjectMember) {
             throw new ForbiddenException("You are not a participant in this conversation.");
         }
     }
 
     @Transactional(readOnly = true)
     public boolean isConversationMember(String conversationId, String userId) {
-        return conversationMemberRepository.existsByConversationIdAndUserId(conversationId, userId);
+        Conversation conversation = conversationRepository.findById(conversationId).orElse(null);
+        return conversation != null
+                && conversationMemberRepository.existsByConversationIdAndUserId(conversationId, userId)
+                && (conversation.getProjectId() == null
+                    || projectConversationService.hasProjectAccess(conversation.getProjectId(), userId));
     }
 
     private Optional<Conversation> findDirectConversation(String userId, String otherUserId) {

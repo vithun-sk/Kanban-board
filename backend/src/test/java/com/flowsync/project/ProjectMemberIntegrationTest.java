@@ -3,6 +3,7 @@ package com.flowsync.project;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowsync.auth.RegisterRequest;
+import com.flowsync.user.UpdateRoleRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -175,6 +176,78 @@ public class ProjectMemberIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("already a member")));
 
+        assertEquals(2, getMembers(ownerToken, projectId).size());
+    }
+
+    @Test
+    void workspaceAdminCannotRemoveMembershipsFromProjectsTheyDoNotLead() throws Exception {
+        String ownerToken = registerAndGetToken("Project Owner", "owner-admin-remove@example.com");
+        String adminToken = registerAndGetToken("Workspace Admin", "workspace-admin-remove@example.com");
+        String targetToken = registerAndGetToken("Target Member", "target-admin-remove@example.com");
+        String adminId = objectMapper.readTree(mockMvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString()).get("data").get("id").asText();
+        mockMvc.perform(patch("/api/v1/users/" + adminId + "/role")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new UpdateRoleRequest("Admin"))))
+                .andExpect(status().isOk());
+
+        String firstProjectId = createProject(ownerToken, "First admin-removal project");
+        String secondProjectId = createProject(ownerToken, "Second admin-removal project");
+        for (String projectId : new String[]{firstProjectId, secondProjectId}) {
+            mockMvc.perform(post("/api/v1/projects/" + projectId + "/members")
+                            .header("Authorization", "Bearer " + ownerToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(
+                                    new AddMemberRequest(null, "target-admin-remove@example.com", "Member"))))
+                    .andExpect(status().isCreated());
+        }
+
+        String targetId = objectMapper.readTree(mockMvc.perform(get("/api/v1/auth/me")
+                                .header("Authorization", "Bearer " + targetToken))
+                        .andExpect(status().isOk())
+                        .andReturn().getResponse().getContentAsString()).get("data").get("id").asText();
+        mockMvc.perform(delete("/api/v1/users/" + targetId + "/memberships")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isForbidden());
+
+        assertEquals(2, getMembers(ownerToken, firstProjectId).size());
+        assertEquals(2, getMembers(ownerToken, secondProjectId).size());
+    }
+
+    @Test
+    void ordinaryMemberCannotRemoveAnotherUsersMembership() throws Exception {
+        String ownerToken = registerAndGetToken("Project Owner", "owner-member-remove@example.com");
+        String ordinaryToken = registerAndGetToken("Ordinary Member", "ordinary-member-remove@example.com");
+        String targetToken = registerAndGetToken("Target Member", "target-member-remove@example.com");
+        String projectId = createProject(ownerToken, "Permission project");
+        mockMvc.perform(post("/api/v1/projects/" + projectId + "/members")
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new AddMemberRequest(null, "target-member-remove@example.com", "Member"))))
+                .andExpect(status().isCreated());
+        JsonNode projectMembers = getMembers(ownerToken, projectId);
+        String membershipId = null;
+        for (JsonNode membership : projectMembers) {
+            if ("target-member-remove@example.com".equals(membership.get("email").asText())) {
+                membershipId = membership.get("id").asText();
+            }
+        }
+        assertTrue(membershipId != null);
+        String targetId = objectMapper.readTree(mockMvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + targetToken))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString()).get("data").get("id").asText();
+
+        mockMvc.perform(delete("/api/v1/projects/" + projectId + "/members/" + membershipId)
+                        .header("Authorization", "Bearer " + ordinaryToken))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(delete("/api/v1/users/" + targetId + "/memberships")
+                        .header("Authorization", "Bearer " + ordinaryToken))
+                .andExpect(status().isForbidden());
         assertEquals(2, getMembers(ownerToken, projectId).size());
     }
 }

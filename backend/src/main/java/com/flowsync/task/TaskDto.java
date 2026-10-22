@@ -39,7 +39,7 @@ public class TaskDto {
             dto.setProjectName(task.getProject().getName());
         }
         dto.setTitle(task.getTitle());
-        dto.setDescription(task.getDescription());
+        dto.setDescription(task.getDescription() != null ? task.getDescription() : "");
         dto.setStatus(task.getStatus() != null ? task.getStatus().getLabel() : "To Do");
         dto.setPriority(task.getPriority() != null ? task.getPriority().getLabel() : "Medium");
 

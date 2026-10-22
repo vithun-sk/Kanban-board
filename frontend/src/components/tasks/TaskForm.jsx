@@ -11,6 +11,7 @@ const TaskForm = ({
   onCancel,
   submitting,
   submitLabel = "Save task",
+  canAssignProject = () => false,
 }) => {
   const [title, setTitle] = useState(initial?.title || "");
   const [description, setDescription] = useState(initial?.description || "");
@@ -22,6 +23,16 @@ const TaskForm = ({
   const [dueDate, setDueDate] = useState(initial?.dueDate || "");
   const [labels, setLabels] = useState(initial?.labels || []);
   const [errors, setErrors] = useState({});
+  const selectedProject = projects.find(
+    (project) => String(project.id) === String(projectId),
+  );
+  const canAssign = canAssignProject(selectedProject);
+  const projectMemberIds = new Set([
+    ...(selectedProject?.memberList || []).map((membership) => String(membership.userId)),
+    ...(selectedProject?.memberIds || []).map(String),
+    ...(selectedProject?.createdById ? [String(selectedProject.createdById)] : []),
+  ]);
+  const projectMembers = members.filter((member) => projectMemberIds.has(String(member.id)));
 
   const toggleLabel = (label) => {
     setLabels((current) =>
@@ -39,17 +50,18 @@ const TaskForm = ({
     }
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
-    onSubmit({
+    const payload = {
       title,
       description,
       projectId,
       status,
       priority,
-      assigneeId: assigneeId || null,
-      startDate,
-      dueDate,
+      startDate: startDate || null,
+      dueDate: dueDate || null,
       labels,
-    });
+    };
+    if (canAssign) payload.assigneeId = assigneeId || null;
+    onSubmit(payload);
   };
 
   return (
@@ -82,21 +94,23 @@ const TaskForm = ({
             ))}
           </select>
         </Field>
-        <Field label="Assignee" htmlFor="task-assignee">
-          <select
-            id="task-assignee"
-            value={assigneeId}
-            onChange={(event) => setAssigneeId(event.target.value)}
-            className={inputClass}
-          >
-            <option value="">Unassigned</option>
-            {members.map((member) => (
-              <option key={member.id} value={member.id}>
-                {member.name}
-              </option>
-            ))}
-          </select>
-        </Field>
+        {canAssign ? (
+          <Field label="Assignee" htmlFor="task-assignee">
+            <select
+              id="task-assignee"
+              value={assigneeId}
+              onChange={(event) => setAssigneeId(event.target.value)}
+              className={inputClass}
+            >
+              <option value="">Unassigned</option>
+              {projectMembers.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        ) : null}
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Status" htmlFor="task-status">

@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { isDemoMode } from "@/config/env";
@@ -36,7 +37,6 @@ import {
 } from "@/services/tasksService";
 import {
   findUserByEmail,
-  listMembers,
   removeUserMembershipsApi,
   updateProfileApi,
   updateUserRoleApi,
@@ -47,6 +47,12 @@ import {
   markAllNotificationsReadApi,
   markNotificationReadApi,
 } from "@/services/notificationsService";
+import {
+  acceptProjectInvitation as acceptProjectInvitationApi,
+  declineProjectInvitation as declineProjectInvitationApi,
+  listInvitations,
+  sendProjectInvitation as sendProjectInvitationApi,
+} from "@/services/invitationsService";
 import {
   createConversationApi,
   listConversations,
@@ -106,6 +112,7 @@ export function AppProvider({ children }) {
   const demo = isDemoMode();
   const [workspace, setWorkspace] = useState(getDemoState);
   const [session, setSession] = useState(() => getSession());
+  const currentUser = session?.user || defaultUser;
   const [theme, setThemeState] = useState(() => readJSON(STORAGE_KEYS.THEME, "light"));
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(!demo);
@@ -116,16 +123,19 @@ export function AppProvider({ children }) {
   const [apiTasks, setApiTasks] = useState([]);
   const [apiMembers, setApiMembers] = useState([]);
   const [apiNotifications, setApiNotifications] = useState([]);
+  const [apiInvitations, setApiInvitations] = useState([]);
   const [apiConversations, setApiConversations] = useState([]);
   const [apiMessages, setApiMessages] = useState([]);
   const [apiMessagePages, setApiMessagePages] = useState({});
   const [apiMessageStatus, setApiMessageStatus] = useState({});
   const [apiActivity, setApiActivity] = useState([]);
+  const [realtimeStatus, setRealtimeStatus] = useState("idle");
   const [apiSettings, setApiSettings] = useState(() => ({
     notifyTaskAssigned: true,
     notifyDeadlines: true,
     notifyMessages: true,
   }));
+  const apiLoadRequestRef = useRef(0);
 
   // Sync demo state changes when in demo mode
   useEffect(() => {
@@ -141,8 +151,15 @@ export function AppProvider({ children }) {
   // Load backend data when in API mode
   const loadApiData = useCallback(async () => {
     if (demo) return;
+    const requestId = ++apiLoadRequestRef.current;
     const currentSession = getSession();
     if (!currentSession?.token) {
+      setApiProjects([]);
+      setApiTasks([]);
+      setApiNotifications([]);
+      setApiInvitations([]);
+      setApiConversations([]);
+      setApiMessages([]);
       setLoading(false);
       return;
     }
@@ -154,35 +171,100 @@ export function AppProvider({ children }) {
       const results = await Promise.allSettled([
         listProjects(),
         listTasks(),
-        listMembers(),
         listNotifications(),
         listConversations(),
+        listInvitations(),
       ]);
 
-      const [projectsResult, tasksResult, membersResult, notificationsResult, conversationsResult] = results;
+      const [
+        projectsResult,
+        tasksResult,
+        notificationsResult,
+        conversationsResult,
+        invitationsResult,
+      ] = results;
+      if (requestId !== apiLoadRequestRef.current) return;
       const failure = results.find((result) => result.status === "rejected");
 
       if (projectsResult.status === "fulfilled") setApiProjects(projectsResult.value || []);
       if (tasksResult.status === "fulfilled") setApiTasks(tasksResult.value || []);
-      if (membersResult.status === "fulfilled") setApiMembers(membersResult.value || []);
       if (notificationsResult.status === "fulfilled") setApiNotifications(notificationsResult.value || []);
       if (conversationsResult.status === "fulfilled") setApiConversations(conversationsResult.value || []);
+      if (invitationsResult.status === "fulfilled") setApiInvitations(invitationsResult.value || []);
 
       if (failure) {
         setApiError(failure.reason?.message || "Failed to load workspace data from API.");
       }
     } catch (err) {
+      if (requestId !== apiLoadRequestRef.current) return;
       setApiError(err.message || "Failed to load workspace data from API.");
     } finally {
-      setLoading(false);
+      if (requestId === apiLoadRequestRef.current) setLoading(false);
     }
   }, [demo]);
 
+  const sendInvitation = useCallback(
+    async (projectId, inviteeId) => {
+      const invitation = await sendProjectInvitationApi(projectId, inviteeId);
+      return invitation;
+    },
+    []
+  );
+
+  const respondToInvitation = useCallback(
+    async (invitationId, response) => {
+      const updated = response === "accept"
+        ? await acceptProjectInvitationApi(invitationId)
+        : await declineProjectInvitationApi(invitationId);
+      setApiInvitations((previous) =>
+        previous.map((invitation) => invitation.id === updated.id ? updated : invitation)
+      );
+      if (response === "accept") await loadApiData();
+      return updated;
+    },
+    [loadApiData]
+  );
+
   useEffect(() => {
-    if (!demo && session?.token) {
-      loadApiData();
-    }
+    if (!demo) void loadApiData();
   }, [demo, session?.token, loadApiData]);
+
+  // Derive members from accessible projects (do not use global users list)
+  useEffect(() => {
+    if (demo) return;
+    const membersMap = new Map();
+    // Include current user
+    if (currentUser?.id) {
+      membersMap.set(currentUser.id, {
+        id: currentUser.id,
+        name: currentUser.name,
+        email: currentUser.email,
+        initials: currentUser.initials,
+        role: currentUser.role || "Member",
+        title: currentUser.title || "",
+      });
+    }
+    for (const project of apiProjects) {
+      if (Array.isArray(project.memberList)) {
+        for (const pm of project.memberList) {
+          if (pm?.userId && !membersMap.has(pm.userId)) {
+            membersMap.set(pm.userId, {
+              id: pm.userId,
+              name: pm.name,
+              email: pm.email,
+              initials: pm.initials,
+              role: pm.role || "Member",
+              title: pm.title || "",
+            });
+          } else if (pm?.userId && membersMap.has(pm.userId)) {
+            const existing = membersMap.get(pm.userId);
+            membersMap.set(pm.userId, { ...existing, name: existing.name || pm.name, email: existing.email || pm.email, initials: existing.initials || pm.initials, role: existing.role || pm.role });
+          }
+        }
+      }
+    }
+    setApiMembers(Array.from(membersMap.values()));
+  }, [demo, apiProjects, currentUser]);
 
   // Keep the real-time connection aligned with the signed in session.
   useEffect(() => {
@@ -194,7 +276,8 @@ export function AppProvider({ children }) {
     return undefined;
   }, [demo, session?.token]);
 
-  const currentUser = session?.user || defaultUser;
+  // Surface the live connection state so the chat can report it honestly.
+  useEffect(() => realtimeClient.onStatus(setRealtimeStatus), []);
 
   const refreshSession = useCallback(() => {
     const s = getSession();
@@ -527,7 +610,7 @@ export function AppProvider({ children }) {
   const removeMember = useCallback(
     async (id) => {
       if (!demo) {
-        // The memberships are removed by the API. The account itself stays untouched.
+        // Remove the member from all projects they belong to
         await removeUserMembershipsApi(id);
         setApiMembers((prev) => prev.filter((member) => member.id !== id));
         setApiProjects((prev) =>
@@ -539,13 +622,10 @@ export function AppProvider({ children }) {
               memberList,
               memberIds: removed
                 ? (project.memberIds || []).filter((memberId) => memberId !== id)
-                : project.memberIds,
+                : (project.memberIds || []).filter((memberId) => memberId !== id),
               members: memberList.length,
             };
           })
-        );
-        setApiTasks((prev) =>
-          prev.map((task) => (task.assigneeId === id ? { ...task, assigneeId: null } : task))
         );
         return;
       }
@@ -571,20 +651,21 @@ export function AppProvider({ children }) {
         const added = await addProjectMemberApi(projectId, payload);
         // The state is only updated after the API confirmed the membership.
         setApiProjects((prev) =>
-          prev.map((project) =>
-            project.id === projectId
-              ? {
-                  ...project,
-                  memberList: project.memberList?.some((member) => member.id === added.id)
-                    ? project.memberList
-                    : [...(project.memberList || []), added],
-                  memberIds: project.memberIds?.includes(added.userId)
-                    ? project.memberIds
-                    : [...(project.memberIds || []), added.userId],
-                  members: (project.members || 0) + 1,
-                }
-              : project
-          )
+          prev.map((project) => {
+            if (project.id !== projectId) return project;
+            const memberList = project.memberList?.some((member) => member.id === added.id)
+              ? project.memberList
+              : [...(project.memberList || []), added];
+            const memberIds = project.memberIds?.includes(added.userId)
+              ? project.memberIds
+              : [...(project.memberIds || []), added.userId];
+            return {
+              ...project,
+              memberList,
+              memberIds,
+              members: memberList.length,
+            };
+          })
         );
         setApiActivity((prev) =>
           pushActivity(prev, `${currentUser.name} added ${added.name || "a member"} to a project.`)
@@ -820,6 +901,11 @@ export function AppProvider({ children }) {
             : conversation
         )
       );
+      listNotifications()
+        .then((items) => setApiNotifications(items || []))
+        .catch((err) => {
+            setApiError(err.message || "Failed to refresh message notifications.");
+        });
       handler?.(message);
     });
   }, []);
@@ -928,6 +1014,7 @@ export function AppProvider({ children }) {
       tasks: apiTasks,
       members: apiMembers,
       notifications: apiNotifications,
+      invitations: apiInvitations,
       conversations: apiConversations,
       messages: apiMessages,
       activity: apiActivity,
@@ -940,6 +1027,7 @@ export function AppProvider({ children }) {
     apiTasks,
     apiMembers,
     apiNotifications,
+    apiInvitations,
     apiConversations,
     apiMessages,
     apiActivity,
@@ -969,6 +1057,10 @@ export function AppProvider({ children }) {
     () => currentWorkspace.notifications.filter((item) => !item.read).length,
     [currentWorkspace.notifications]
   );
+  const invitations = useMemo(
+    () => currentWorkspace.invitations || [],
+    [currentWorkspace.invitations]
+  );
 
   const value = useMemo(
     () => ({
@@ -977,10 +1069,12 @@ export function AppProvider({ children }) {
       tasks,
       members: currentWorkspace.members,
       notifications: currentWorkspace.notifications,
+      invitations,
       conversations: currentWorkspace.conversations,
       messages: currentWorkspace.messages,
       messageStatus: apiMessageStatus,
       messagePages: apiMessagePages,
+      realtimeStatus,
       activity: currentWorkspace.activity,
       settings: currentWorkspace.settings,
       currentUser,
@@ -992,6 +1086,9 @@ export function AppProvider({ children }) {
       isDemoMode: demo,
       metrics,
       unreadCount,
+      pendingInvitationCount: invitations.filter(
+        (invitation) => invitation.status === "PENDING",
+      ).length,
       refreshSession,
       setTheme,
       createProject,
@@ -1008,6 +1105,8 @@ export function AppProvider({ children }) {
       markNotificationRead,
       markAllNotificationsRead,
       dismissNotification,
+      sendInvitation,
+      respondToInvitation,
       sendMessage,
       createConversation,
       loadMessages,
@@ -1033,6 +1132,7 @@ export function AppProvider({ children }) {
       unreadCount,
       apiMessageStatus,
       apiMessagePages,
+      realtimeStatus,
       refreshSession,
       setTheme,
       createProject,
@@ -1049,6 +1149,9 @@ export function AppProvider({ children }) {
       markNotificationRead,
       markAllNotificationsRead,
       dismissNotification,
+      sendInvitation,
+      respondToInvitation,
+      invitations,
       sendMessage,
       createConversation,
       loadMessages,

@@ -11,6 +11,9 @@ public class UpdateProjectRequest {
     private LocalDate startDate;
     private LocalDate dueDate;
     private LocalDate deadline;
+    private boolean startDateProvided;
+    private boolean dueDateProvided;
+    private boolean deadlineProvided;
 
     public UpdateProjectRequest() {
     }
@@ -61,10 +64,19 @@ public class UpdateProjectRequest {
 
     public void setStartDate(LocalDate startDate) {
         this.startDate = startDate;
+        this.startDateProvided = true;
+    }
+
+    public boolean isStartDateProvided() {
+        return startDateProvided;
     }
 
     public LocalDate getEffectiveDueDate() {
-        return dueDate != null ? dueDate : deadline;
+        return dueDateProvided ? dueDate : deadline;
+    }
+
+    public boolean isEffectiveDueDateProvided() {
+        return dueDateProvided || deadlineProvided;
     }
 
     public LocalDate getDueDate() {
@@ -73,6 +85,7 @@ public class UpdateProjectRequest {
 
     public void setDueDate(LocalDate dueDate) {
         this.dueDate = dueDate;
+        this.dueDateProvided = true;
     }
 
     public LocalDate getDeadline() {
@@ -81,5 +94,6 @@ public class UpdateProjectRequest {
 
     public void setDeadline(LocalDate deadline) {
         this.deadline = deadline;
+        this.deadlineProvided = true;
     }
 }

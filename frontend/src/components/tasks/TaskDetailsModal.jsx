@@ -3,6 +3,7 @@ import { CalendarDays, UserRound } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import TaskForm from "@/components/tasks/TaskForm";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/context/ToastContext";
 import { TASK_PRIORITY_LIST, TASK_STATUS_LIST } from "@/constants";
 import { formatDate } from "@/lib/dates";
 import { Field, inputClass } from "@/components/ui/Field";
@@ -15,9 +16,13 @@ const TaskDetailsModal = ({
   members = [],
   projects = [],
   submitting = false,
+  currentUser,
+  isDemoMode = false,
 }) => {
+  const { push } = useToast();
   const [draft, setDraft] = useState(task);
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
@@ -26,6 +31,31 @@ const TaskDetailsModal = ({
   }, [task]);
 
   if (!task) return null;
+
+  const project = projects.find((item) => String(item.id) === String(task.projectId));
+  const isProjectLeader =
+    isDemoMode ||
+    Boolean(project?.createdById && currentUser?.id &&
+      String(project.createdById) === String(currentUser.id));
+  const canAssignProject = (taskProject) =>
+    String(taskProject?.id) === String(task.projectId) &&
+    (isDemoMode ||
+      Boolean(
+        taskProject?.createdById &&
+          currentUser?.id &&
+          String(taskProject.createdById) === String(currentUser.id),
+      ));
+
+  const handleQuickUpdate = async (patch) => {
+    const previous = draft;
+    setDraft((current) => ({ ...current, ...patch }));
+    try {
+      await onSave(task.id, patch);
+    } catch (err) {
+      setDraft(previous);
+      push(err.message || "Failed to update the task.", "error");
+    }
+  };
 
   return (
     <>
@@ -42,11 +72,20 @@ const TaskDetailsModal = ({
             initial={task}
             projects={projects}
             members={members}
-            submitting={submitting}
+            submitting={submitting || saving}
+            canAssignProject={canAssignProject}
             onCancel={() => setEditing(false)}
-            onSubmit={(payload) => {
-              onSave(task.id, payload);
-              setEditing(false);
+            onSubmit={async (payload) => {
+              setSaving(true);
+              try {
+                await onSave(task.id, payload);
+                setEditing(false);
+                push("Task updated.");
+              } catch (err) {
+                push(err.message || "Failed to update the task.", "error");
+              } finally {
+                setSaving(false);
+              }
             }}
           />
         ) : (
@@ -62,10 +101,7 @@ const TaskDetailsModal = ({
                 <select
                   id="details-status"
                   value={draft.status}
-                  onChange={(event) => {
-                    setDraft((current) => ({ ...current, status: event.target.value }));
-                    onSave(task.id, { status: event.target.value });
-                  }}
+                  onChange={(event) => handleQuickUpdate({ status: event.target.value })}
                   className={inputClass}
                 >
                   {TASK_STATUS_LIST.map((value) => (
@@ -77,10 +113,7 @@ const TaskDetailsModal = ({
                 <select
                   id="details-priority"
                   value={draft.priority}
-                  onChange={(event) => {
-                    setDraft((current) => ({ ...current, priority: event.target.value }));
-                    onSave(task.id, { priority: event.target.value });
-                  }}
+                  onChange={(event) => handleQuickUpdate({ priority: event.target.value })}
                   className={inputClass}
                 >
                   {TASK_PRIORITY_LIST.map((value) => (
@@ -124,13 +157,15 @@ const TaskDetailsModal = ({
               </div>
             </div>
             <div className="flex flex-wrap justify-end gap-3 border-t border-[var(--outline-variant)] pt-5">
-              <button
-                type="button"
-                onClick={() => setConfirmDelete(true)}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-[var(--error)]"
-              >
-                Delete
-              </button>
+              {isProjectLeader ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(true)}
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-[var(--error)]"
+                >
+                  Delete
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => setEditing(true)}
@@ -149,10 +184,16 @@ const TaskDetailsModal = ({
           confirmLabel="Delete task"
           destructive
           onClose={() => setConfirmDelete(false)}
-          onConfirm={() => {
-            onDelete(task.id);
-            setConfirmDelete(false);
-            onClose();
+          onConfirm={async () => {
+            try {
+              await onDelete(task.id);
+              push("Task deleted.");
+              setConfirmDelete(false);
+              onClose();
+            } catch (err) {
+              push(err.message || "Failed to delete the task.", "error");
+              setConfirmDelete(false);
+            }
           }}
         />
       ) : null}

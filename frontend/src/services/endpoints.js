@@ -23,6 +23,11 @@ export const endpoints = {
   notification: (id) => `/notifications/${id}`,
   notificationRead: (id) => `/notifications/${id}/read`,
   notificationsReadAll: "/notifications/read-all",
+  invitations: "/invitations",
+  projectInvitations: (projectId) => `/projects/${projectId}/invitations`,
+  invitationAccept: (id) => `/invitations/${id}/accept`,
+  invitationDecline: (id) => `/invitations/${id}/decline`,
+  invitationCancel: (projectId, id) => `/projects/${projectId}/invitations/${id}/cancel`,
   conversations: "/conversations",
   messages: (conversationId) => `/conversations/${conversationId}/messages`,
   messagePage: (conversationId, page = 0, size = 50) =>

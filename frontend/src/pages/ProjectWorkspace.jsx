@@ -14,8 +14,14 @@ import EmptyState from "@/components/ui/EmptyState";
 import { Field, inputClass } from "@/components/ui/Field";
 import { useApp } from "@/context/AppContext";
 import { useToast } from "@/context/ToastContext";
-import { formatDate } from "@/lib/dates";
+import { formatDate, relativeTime } from "@/lib/dates";
+import { isValidEmail } from "@/lib/validation";
 import { MEMBER_ROLES, TASK_STATUS } from "@/constants";
+import { findUserByEmail } from "@/services/membersService";
+import {
+  cancelProjectInvitation,
+  listProjectInvitations,
+} from "@/services/invitationsService";
 
 const ProjectWorkspace = () => {
   const { id } = useParams();
@@ -24,18 +30,24 @@ const ProjectWorkspace = () => {
     projects,
     tasks,
     members,
+    notifications,
     conversations,
+    currentUser,
     updateProject,
     deleteProject,
     updateTask,
     deleteTask,
     addProjectMember,
     removeProjectMember,
+    sendInvitation,
+    markNotificationRead,
     openTeamConversation,
     submitting,
+    isDemoMode,
   } = useApp();
   const { push } = useToast();
-  const project = projects.find((item) => item.id === id);
+  const project = projects.find((item) => String(item.id) === String(id));
+  const projectId = project?.id;
   const [search, setSearch] = useState("");
   const [priority, setPriority] = useState("All");
   const [view, setView] = useState("board");
@@ -44,9 +56,14 @@ const ProjectWorkspace = () => {
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
-  const [selectedMemberId, setSelectedMemberId] = useState("");
+  const [memberEmail, setMemberEmail] = useState("");
   const [memberRole, setMemberRole] = useState("Member");
+  const [memberError, setMemberError] = useState(null);
+  const [memberLookup, setMemberLookup] = useState(null);
+  const [addingMember, setAddingMember] = useState(false);
   const [removingMember, setRemovingMember] = useState(null);
+  const [projectInvitations, setProjectInvitations] = useState([]);
+  const [loadingInvitations, setLoadingInvitations] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatConversationId, setChatConversationId] = useState(null);
   const [chatLoading, setChatLoading] = useState(false);
@@ -72,6 +89,18 @@ const ProjectWorkspace = () => {
       const conversation = await openTeamConversation(project.id);
       setChatConversationId(conversation?.id || null);
       setChatOpen(true);
+      const unreadProjectMessages = notifications.filter(
+        (item) =>
+          !item.read &&
+          item.type === "message" &&
+          item.relatedType === "project" &&
+          String(item.relatedId) === String(project.id),
+      );
+      try {
+        await Promise.all(unreadProjectMessages.map((item) => markNotificationRead(item.id)));
+      } catch (err) {
+        push(err.message || "Chat opened, but unread notifications could not be cleared.", "error");
+      }
     } catch (err) {
       setChatError(err.message || "Failed to open the team conversation.");
       push(err.message || "Failed to open the team conversation.", "error");
@@ -83,20 +112,86 @@ const ProjectWorkspace = () => {
   const projectTasks = useMemo(() => {
     return tasks.filter((task) => {
       if (task.projectId !== id) return false;
+      const description = task.description || "";
       const matchesSearch =
-        task.title.toLowerCase().includes(search.toLowerCase()) ||
-        task.description.toLowerCase().includes(search.toLowerCase());
+        (task.title || "").toLowerCase().includes(search.toLowerCase()) ||
+        description.toLowerCase().includes(search.toLowerCase());
       const matchesPriority = priority === "All" || task.priority === priority;
       return matchesSearch && matchesPriority;
     });
   }, [tasks, id, search, priority]);
+  const unreadMessageCount = useMemo(
+    () =>
+      notifications.filter(
+        (item) =>
+          !item.read &&
+          item.type === "message" &&
+          item.relatedType === "project" &&
+          String(item.relatedId) === String(project?.id),
+      ).length,
+    [notifications, project?.id],
+  );
 
-  const availableMembers = useMemo(() => {
-    const existingIds = new Set(
-      (project?.memberList || []).map((m) => m.id || m.userId)
-    );
-    return members.filter((m) => !existingIds.has(m.id) && !existingIds.has(m.userId));
-  }, [members, project?.memberList]);
+  const isProjectLeader =
+    isDemoMode ||
+    Boolean(project?.createdById && currentUser?.id &&
+      String(project.createdById) === String(currentUser.id));
+  const canManageMembers = isProjectLeader;
+
+  useEffect(() => {
+    if (!projectId || !canManageMembers || isDemoMode) {
+      setProjectInvitations([]);
+      setLoadingInvitations(false);
+      return undefined;
+    }
+
+    let active = true;
+    setLoadingInvitations(true);
+    listProjectInvitations(projectId)
+      .then((items) => {
+        if (active) setProjectInvitations(items || []);
+      })
+      .catch((err) => {
+        if (active) push(err.message || "Failed to load project invitations.", "error");
+      })
+      .finally(() => {
+        if (active) setLoadingInvitations(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [projectId, canManageMembers, isDemoMode, push]);
+
+  const handleMemberEmailChange = (value) => {
+    setMemberEmail(value);
+    setMemberError(null);
+    setMemberLookup(null);
+  };
+
+  const handleLookupMember = async () => {
+    const email = memberEmail.trim();
+    if (!email) {
+      setMemberError("Enter the email address of the teammate.");
+      return null;
+    }
+    if (!isValidEmail(email)) {
+      setMemberError("Enter a valid email address.");
+      return null;
+    }
+    setAddingMember(true);
+    setMemberError(null);
+    try {
+      const account = await findUserByEmail(email);
+      setMemberLookup(account);
+      return account;
+    } catch (err) {
+      setMemberLookup(null);
+      setMemberError(err.message || "No registered FlowSync account found for that email.");
+      return null;
+    } finally {
+      setAddingMember(false);
+    }
+  };
 
   if (!project) {
     return (
@@ -143,20 +238,24 @@ const ProjectWorkspace = () => {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="rounded-lg border border-[var(--outline-variant)] px-4 py-2 text-sm"
-          >
-            Edit
-          </button>
-          <button
-            type="button"
-            onClick={() => setConfirmDelete(true)}
-            className="rounded-lg border border-[var(--error)] px-4 py-2 text-sm text-[var(--error)]"
-          >
-            Delete
-          </button>
+          {isProjectLeader ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="rounded-lg border border-[var(--outline-variant)] px-4 py-2 text-sm"
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                className="rounded-lg border border-[var(--error)] px-4 py-2 text-sm text-[var(--error)]"
+              >
+                Delete
+              </button>
+            </>
+          ) : null}
           <button
             type="button"
             onClick={() => setShowCreate(true)}
@@ -181,17 +280,22 @@ const ProjectWorkspace = () => {
       <section className="mt-6">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold">Members ({project.memberList.length})</h2>
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedMemberId(availableMembers[0]?.id || "");
-              setAddMemberOpen(true);
-            }}
-            className="flex items-center gap-1.5 text-xs font-medium text-[var(--primary)] hover:underline"
-          >
-            <UserPlus size={14} />
-            Add member
-          </button>
+          {canManageMembers ? (
+            <button
+              type="button"
+              onClick={() => {
+                setMemberEmail("");
+                setMemberRole("Member");
+                setMemberError(null);
+                setMemberLookup(null);
+                setAddMemberOpen(true);
+              }}
+              className="flex items-center gap-1.5 text-xs font-medium text-[var(--primary)] hover:underline"
+            >
+              <UserPlus size={14} />
+              {isDemoMode ? "Add member" : "Invite member"}
+            </button>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
           {project.memberList.map((member) => (
@@ -206,7 +310,7 @@ const ProjectWorkspace = () => {
               {member.role ? (
                 <span className="text-xs text-[var(--outline)]">({member.role})</span>
               ) : null}
-              {project.memberList.length > 1 ? (
+              {canManageMembers && String(member.userId) !== String(project.createdById) ? (
                 <button
                   type="button"
                   title="Remove from project"
@@ -221,9 +325,61 @@ const ProjectWorkspace = () => {
         </div>
       </section>
 
+      {canManageMembers && !isDemoMode ? (
+        <section className="mt-6 rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container)] p-4">
+          <h2 className="font-semibold">Project invitations</h2>
+          {loadingInvitations ? (
+            <p className="mt-3 text-sm text-[var(--outline)]">Loading invitations…</p>
+          ) : projectInvitations.length === 0 ? (
+            <p className="mt-3 text-sm text-[var(--outline)]">No invitations have been sent.</p>
+          ) : (
+            <ul className="mt-3 divide-y divide-[var(--outline-variant)]">
+              {projectInvitations.map((invitation) => (
+                <li key={invitation.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                  <div>
+                    <p className="text-sm font-medium">
+                      {invitation.inviteeName} · {invitation.inviteeEmail}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--outline)]">
+                      {invitation.status} · Sent {relativeTime(invitation.createdAt)}
+                    </p>
+                  </div>
+                  {invitation.status === "PENDING" ? (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const updated = await cancelProjectInvitation(project.id, invitation.id);
+                          setProjectInvitations((items) =>
+                            items.map((item) => item.id === updated.id ? updated : item)
+                          );
+                          push("Invitation cancelled.");
+                        } catch (err) {
+                          push(err.message || "Failed to cancel the invitation.", "error");
+                        }
+                      }}
+                      className="text-sm text-[var(--error)]"
+                    >
+                      Cancel
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
+
       <section className="mt-6">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Team chat</h2>
+          <h2 className="flex items-center gap-2 text-sm font-semibold">
+            Team chat
+            {unreadMessageCount > 0 ? (
+              <span className="rounded-full bg-[var(--primary)] px-2 py-0.5 text-[10px] text-white">
+                {unreadMessageCount} unread
+              </span>
+            ) : null}
+          </h2>
           <button
             type="button"
             onClick={handleOpenChat}
@@ -335,6 +491,8 @@ const ProjectWorkspace = () => {
           onClose={() => setSelectedTask(null)}
           onSave={updateTask}
           onDelete={deleteTask}
+          currentUser={currentUser}
+          isDemoMode={isDemoMode}
         />
       ) : null}
       {showCreate ? <CreateTaskModal projectId={project.id} onClose={() => setShowCreate(false)} /> : null}
@@ -376,53 +534,65 @@ const ProjectWorkspace = () => {
       ) : null}
       {addMemberOpen ? (
         <Modal
-          title={`Add member to ${project.name}`}
-          description="Select a registered workspace user to join this project."
+          title={`${isDemoMode ? "Add member to" : "Invite member to"} ${project.name}`}
+          description={
+            isDemoMode
+              ? "This adds a local demo profile."
+              : "Look up an existing FlowSync account. Membership begins after they accept the invitation."
+          }
           onClose={() => setAddMemberOpen(false)}
           closeOnBackdrop={false}
         >
           <form
             onSubmit={async (event) => {
               event.preventDefault();
-              if (!selectedMemberId) {
-                push("Please select a member to add.", "error");
-                return;
-              }
+              const account =
+                memberLookup?.email?.toLowerCase() === memberEmail.trim().toLowerCase()
+                  ? memberLookup
+                  : await handleLookupMember();
+              if (!account) return;
+              setAddingMember(true);
               try {
-                await addProjectMember(project.id, {
-                  userId: selectedMemberId,
-                  role: memberRole,
-                });
-                push("Member added to project.");
+                if (isDemoMode) {
+                  await addProjectMember(project.id, {
+                    userId: account.id,
+                    email: account.email,
+                    role: memberRole,
+                  });
+                  push(`${account.name} was added to the demo project.`);
+                } else {
+                  const invitation = await sendInvitation(project.id, account.id);
+                  setProjectInvitations((items) => [invitation, ...items]);
+                  push(`Invitation sent to ${account.name}.`);
+                }
                 setAddMemberOpen(false);
+                setMemberEmail("");
+                setMemberLookup(null);
               } catch (err) {
+                setMemberError(err.message || "Failed to add member to project.");
                 push(err.message || "Failed to add member to project.", "error");
+              } finally {
+                setAddingMember(false);
               }
             }}
             className="space-y-4"
           >
-            <Field label="Team member" htmlFor="select-project-member">
-              {availableMembers.length === 0 ? (
-                <p className="text-sm text-[var(--on-surface-variant)]">
-                  All workspace members are already assigned to this project.
-                </p>
-              ) : (
-                <select
-                  id="select-project-member"
-                  value={selectedMemberId}
-                  onChange={(e) => setSelectedMemberId(e.target.value)}
-                  className={inputClass}
-                >
-                  <option value="">Select a member</option>
-                  {availableMembers.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name} ({m.email})
-                    </option>
-                  ))}
-                </select>
-              )}
+            <Field label="Teammate email" htmlFor="project-member-email" error={memberError}>
+              <input
+                id="project-member-email"
+                type="email"
+                value={memberEmail}
+                onChange={(event) => handleMemberEmailChange(event.target.value)}
+                placeholder="teammate@example.com"
+                className={inputClass}
+              />
             </Field>
-            {availableMembers.length > 0 ? (
+            {memberLookup ? (
+              <p className="rounded-lg bg-[var(--surface-container)] px-3 py-2 text-sm">
+                Found account <strong>{memberLookup.name}</strong> ({memberLookup.email}).
+              </p>
+            ) : null}
+            {isDemoMode ? (
               <Field label="Role in project" htmlFor="select-project-role">
                 <select
                   id="select-project-role"
@@ -430,7 +600,7 @@ const ProjectWorkspace = () => {
                   onChange={(e) => setMemberRole(e.target.value)}
                   className={inputClass}
                 >
-                  {MEMBER_ROLES.map((role) => (
+                  {MEMBER_ROLES.filter((role) => role !== "Owner").map((role) => (
                     <option key={role} value={role}>
                       {role}
                     </option>
@@ -446,15 +616,13 @@ const ProjectWorkspace = () => {
               >
                 Cancel
               </button>
-              {availableMembers.length > 0 ? (
-                <button
-                  type="submit"
-                  disabled={!selectedMemberId}
-                  className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm text-white disabled:opacity-50"
-                >
-                  Add member
-                </button>
-              ) : null}
+              <button
+                type="submit"
+                disabled={!memberEmail.trim() || addingMember}
+                className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm text-white disabled:opacity-50"
+              >
+                {addingMember ? "Sending…" : isDemoMode ? "Add locally" : "Send invitation"}
+              </button>
             </div>
           </form>
         </Modal>

@@ -17,15 +17,15 @@ const Topbar = ({ onMenu }) => {
       projects: projects
         .filter(
           (project) =>
-            project.name.toLowerCase().includes(value) ||
-            project.description.toLowerCase().includes(value),
+            (project.name || "").toLowerCase().includes(value) ||
+            (project.description || "").toLowerCase().includes(value),
         )
         .slice(0, 5),
       tasks: tasks
         .filter(
           (task) =>
-            task.title.toLowerCase().includes(value) ||
-            task.description.toLowerCase().includes(value),
+            (task.title || "").toLowerCase().includes(value) ||
+            (task.description || "").toLowerCase().includes(value),
         )
         .slice(0, 5),
     };
